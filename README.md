@@ -1,2 +1,3 @@
 CHESS ARENA FOR PI
-       powere by pi network
+
+       powered by PI NETWORK
