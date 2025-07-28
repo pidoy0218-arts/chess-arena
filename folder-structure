@@ -1,0 +1,30 @@
+/chess-arena-pi/
+│
+├── launch-index.html           ← 🚀 Launch screen (with logo + sound)
+├── login-screen.html           ← 🔐 Login screen with animation
+├── game-board.html             ← ♟️ Full chess game board
+├── puzzle-mode.html            ← 🧠 Puzzle/training mode
+├── leaderboard-page.html       ← 🏆 Leaderboard
+│
+├── /images/
+│   └── logo-main.png           ← 🔆 Edited circular logo
+│
+├── /sounds/
+│   ├── intro-logo.ogg          ← 🎵 Sound for launch screen
+│   ├── move-tap.ogg            ← ✅ Move piece sound
+│   ├── timer-tick.ogg          ← ⏱️ Tick sound for last 10 sec
+│   ├── win-fanfare.ogg         ← 🎉 Win sound
+│   └── lose-defeat.ogg         ← 💀 Lose sound
+│
+├── /css/
+│   ├── style-launch.css        ← 🎨 Launch screen styles
+│   ├── style-login.css         ← 🎨 Login styles
+│   ├── style-game.css          ← 🎨 Chess board UI
+│   └── style-shared.css        ← 💼 Shared styles (fonts, layout)
+│
+├── /js/
+│   ├── logic-game.js           ← ♟️ Chess rules and move handling
+│   ├── logic-login.js          ← 🔐 Login / Pi auth
+│   ├── logic-sound.js          ← 🔊 Centralized sound player
+│   ├── logic-sdk.js            ← 🌐 Pi SDK wrapper
+│   └── logic-confetti.js       ← 🎉 Win animation logic
