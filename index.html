@@ -2,35 +2,134 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>The Chess Arena Pi</title>
-  <link rel="stylesheet" href="css/style-launch.css">
+  <title>Chess Arena Pi – Solid Khaki & Black Board</title>
+  <style>
+    body {
+      background-color: #4caf50;
+      color: #fff;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    h2 {
+      margin-bottom: 60px;
+    }
+
+    #board {
+      display: grid;
+      grid-template-columns: repeat(8, 100px);
+      grid-template-rows: repeat(8, 100px);
+      border: 7px solid #ccc;
+    }
+
+    .square {
+      width: 100px;
+      height: 100px;
+      font-size: 70px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .white-square { background-color: #f0f0f0; }
+    .green-square { background-color: #b1e59f; }
+
+    .white-piece {
+      color: #b8860b; /* Solid golden khaki */
+      font-weight: 900;
+      text-shadow: 3px 3px 0 black;
+    }
+
+    .black-piece {
+      color: black;
+    }
+
+    #status {
+      margin-top: 15px;
+      font-weight: bold;
+    }
+  </style>
 </head>
-  <script>
-  // Optional delay for animation or splash screen
-  setTimeout(() => {
-    window.location.href = "login.html";
-  }, 1000); // 1 second delay
-</script>
 <body>
 
-  <div class="logo-container">
-    <img src="images/logo-main.png" alt="Chess Arena Logo" class="logo" id="logo"/>
-  </div>
+<h2>Chess Arena for Pi</h2>
+<div id="board"></div>
+<div id="status">Powered by PI NETWORK</div>
 
-  <div class="title">THE CHESS ARENA PI</div>
+<script>
+  const boardEl = document.getElementById("board");
+  const statusEl = document.getElementById("status");
 
-  <audio id="introSound" src="sounds/intro-logo.ogg" preload="auto"></audio>
+  const PIECES = {
+    r: "♜", n: "♞", b: "♝", q: "♛", k: "♚", p: "♟",
+    R: "♖", N: "♘", B: "♗", Q: "♕", K: "♔", P: "♙"
+  };
 
-  <script>
-    window.addEventListener("load", () => {
-      const sound = document.getElementById("introSound");
-      const logo = document.getElementById("logo");
-      logo.addEventListener("animationend", () => {
-        sound.play().catch(e => console.warn("Sound blocked:", e));
-      });
-    });
-  </script>
+  let board = [
+    ["r","n","b","q","k","b","n","r"],
+    ["p","p","p","p","p","p","p","p"],
+    ["","","","","","","",""],
+    ["","","","","","","",""],
+    ["","","","","","","",""],
+    ["","","","","","","",""],
+    ["P","P","P","P","P","P","P","P"],
+    ["R","N","B","Q","K","B","N","R"]
+  ];
+
+  let selected = null;
+  let turn = "white";
+
+  function renderBoard() {
+    boardEl.innerHTML = "";
+    for (let row = 0; row < 8; row++) {
+      for (let col = 0; col < 8; col++) {
+        const square = document.createElement("div");
+        square.classList.add("square");
+        square.classList.add((row + col) % 2 === 0 ? "white-square" : "green-square");
+        square.dataset.row = row;
+        square.dataset.col = col;
+
+        const piece = board[row][col];
+        if (piece) {
+          square.textContent = PIECES[piece];
+          square.classList.add(piece === piece.toUpperCase() ? "white-piece" : "black-piece");
+        }
+
+        boardEl.appendChild(square);
+      }
+    }
+
+    statusEl.textContent = `${turn.charAt(0).toUpperCase() + turn.slice(1)} to move`;
+  }
+
+  boardEl.addEventListener("click", (e) => {
+    if (!e.target.classList.contains("square")) return;
+    const row = +e.target.dataset.row;
+    const col = +e.target.dataset.col;
+    const piece = board[row][col];
+
+    if (selected) {
+      const [fromRow, fromCol] = selected;
+      board[row][col] = board[fromRow][fromCol];
+      board[fromRow][fromCol] = "";
+      selected = null;
+      turn = turn === "white" ? "black" : "white";
+      renderBoard();
+    } else {
+      if (!piece) return;
+      if ((turn === "white" && piece === piece.toUpperCase()) ||
+          (turn === "black" && piece === piece.toLowerCase())) {
+        selected = [row, col];
+      }
+    }
+  });
+
+  renderBoard();
+</script>
 
 </body>
 </html>
