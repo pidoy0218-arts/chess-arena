@@ -1,23 +1,132 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Login - Chess Arena Pi</title>
-  <link rel="stylesheet" href="css/style-login.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chess Arena for PI</title>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: #480082; /* purple background */
+      color: #ffd700;      /* Gold text */
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+    h1 {
+      font-size: 2.25em;
+      margin: 0.5em 0;
+    }
+    .knight-circle {
+      width: 220px;
+      height: 220px;
+      background: #ffd700; /* Gold circle */
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 0 auto 20px;
+      animation: bounce 1s infinite alternate;
+    }
+    .knight-circle span {
+      font-size: 14em;
+      color: #676569; /* iron gray knight */
+    }
+    @keyframes bounce {
+      from { transform: translateY(0); }
+      to { transform: translateY(-20px); }
+    }
+    .btn {
+      display: inline-block;
+      padding: 12px 24px;
+      margin-top: 20px;
+      font-size: 1em;
+      font-weight: bold;
+      color: #480082;     /* Purple text */
+      background: #FFD700; /* Gold button */
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    .btn:hover {
+      transform: scale(1.05);
+    }
+    /* Status dot */
+    .status {
+      margin-top: 15px;
+      font-size: 0.9em;
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+    }
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: red; /* default red */
+    }
+  </style>
+
+  <!-- Explicitly load Pi SDK -->
+  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 </head>
 <body>
-
-  <div class="login-container">
-    <img src="images/logo-main.png" alt="Logo" class="login-logo" />
-
-    <h1>Welcome to Chess Arena Pi</h1>
-
-    <button id="loginBtn" class="login-button">🔐 Login with Pi</button>
-
-    <audio id="loginSound" src="sounds/move-tap.ogg" preload="auto"></audio>
+  <div>
+    <div class="knight-circle">
+      <span>♞</span>
+    </div>
+    <h1>CHESS ARENA <span style="color: white;">for</span> PI</h1>
+    <button class="btn" onclick="login()">Login</button>
+    <div class="status">
+      <div id="sdkDot" class="dot"></div>
+      <span id="sdkStatus">Checking Pi SDK...</span>
+    </div>
   </div>
 
-  <script src="js/logic-login.js"></script>
+  <script>
+    function updateStatus(isReady) {
+      const dot = document.getElementById("sdkDot");
+      const text = document.getElementById("sdkStatus");
+      if (isReady) {
+        dot.style.background = "limegreen";
+        text.textContent = "Pi SDK detected";
+      } else {
+        dot.style.background = "red";
+        text.textContent = "Pi SDK not found (fallback mode)";
+      }
+    }
+
+    async function login() {
+      if (window.Pi) {
+        try {
+          Pi.init({ version: "2.0" });
+          const user = await Pi.authenticate(["username"], onIncompletePaymentFound);
+          alert("Welcome, " + user.username + "!");
+          window.location.href = "menu.html";
+        } catch (err) {
+          console.error(err);
+          alert("Pi login failed, try again.");
+        }
+      } else {
+        alert("Local login successful. (Pi SDK not detected)");
+        window.location.href = "menu.html";
+      }
+    }
+
+    function onIncompletePaymentFound(payment) {
+      console.log("Incomplete payment:", payment);
+    }
+
+    // Run check once page loads
+    window.addEventListener("load", () => {
+      updateStatus(!!window.Pi);
+    });
+  </script>
 </body>
 </html>
