@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Chess Arena Pi — Multiplayer (WS + Offline fallback)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  :root{ --bg:#3e2723; --fg:#efeadd; --light:#f0d9b5; --dark:#b58863; --panel:#1e1e1e; --accent:#6d4c41; --accent2:#8d6e63; --warn:#ff5252 }
+  body{ margin:0; font-family:system-ui,Segoe UI,Arial; background:var(--bg); color:var(--fg); display:flex; justify-content:center; padding:18px; box-sizing:border-box; }
+  #app{ width:100%; max-width:1100px; display:grid; grid-template-columns: 1fr 420px; gap:18px; align-items:start; }
+  header{ grid-column:1/-1; text-align:center; margin-bottom:6px }
+  h1{ margin:0; font-size:20px }
+  .sub{ font-size:12px; opacity:.9; margin-top:4px }
+
+  /* Board container */
+  .boards { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; align-items:flex-start; }
+  .board-wrap{ background:var(--panel); padding:12px; border-radius:12px; border:1px solid rgba(0,0,0,.35); box-shadow:0 8px 20px rgba(0,0,0,.5); }
+  .mini-title{ font-size:13px; opacity:.9; margin-bottom:8px; text-align:center }
+
+  .board { width: 384px; height:384px; display:grid; grid-template-columns:repeat(8,1fr); grid-template-rows:repeat(8,1fr); border-radius:8px; overflow:hidden; border:4px solid #5d4037; }
+  .sq{ display:flex; align-items:center; justify-content:center; }
+  .light{ background:var(--light); }
+  .dark{ background:var(--dark); }
+  .sq.sel{ outline:3px solid gold; outline-offset:-3px; }
+  .sq.hint::after{ content:""; width:26%; height:26%; border-radius:50%; background:rgba(90,200,250,.85); display:block; }
+  .piece{ width:90%; height:90%; background-image:url("pieces.png"); background-size:600% 200%; background-repeat:no-repeat; }
+
+  /* Sprite classes */
+  /* Ivory row (top) */
+  .wK{background-position:0% 0%} .wQ{background-position:20% 0%} .wR{background-position:40% 0%}
+  .wB{background-position:60% 0%} .wN{background-position:80% 0%} .wP{background-position:100% 0%}
+  /* Ebony row (bottom) */
+  .bK{background-position:0% 100%} .bQ{background-position:20% 100%} .bR{background-position:40% 100%}
+  .bB{background-position:60% 100%} .bN{background-position:80% 100%} .bP{background-position:100% 100%}
+
+  /* Side panel */
+  .panel{ background:var(--panel); padding:12px; border-radius:12px; border:1px solid rgba(0,0,0,.25) }
+  .players{ display:flex; gap:10px; justify-content:space-between; margin-bottom:10px }
+  .player{ flex:1; padding:8px; border-radius:8px; background:#111; border:1px solid #222; text-align:center }
+  .player .label{ font-weight:800; font-size:13px }
+  .player .id{ font-size:12px; color:#ccc; word-break:break-all }
+  .captured{ min-height:44px; display:flex; gap:4px; flex-wrap:wrap; align-content:flex-start; justify-content:center }
+
+  .row{ display:flex; gap:8px; align-items:center; justify-content:space-between; margin-top:8px }
+  button{ background:var(--accent); color:var(--fg); border:0; padding:8px 10px; border-radius:8px; cursor:pointer; font-weight:700 }
+  button.secondary{ background:#555 }
+  #rematchBtn{ display:none; background:#3bbf7f; color:#041 }
+
+  /* rematch prompt */
+  #rematchPrompt{ display:none; margin-top:8px; padding:12px; background:#222; border-radius:10px; text-align:center }
+
+  /* small screens */
+  @media (max-width:980px){
+    #app{ grid-template-columns: 1fr; }
+    .board{ width:320px; height:320px }
+  }
+</style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>♞ Chess Arena Pi — Multiplayer (WS or Offline)</h1>
+      <div class="sub">Set <code>MULTIPLAYER_WS_URL</code> to your WebSocket server for Internet play — otherwise fallback to local sync / dual-board offline mode.</div>
+    </header>
+
+    <div class="boards">
+      <!-- White's board (left) -->
+      <div class="board-wrap" id="whiteWrap">
+        <div class="mini-title">White View</div>
+        <div id="boardWhite" class="board" aria-label="white board"></div>
+        <div style="margin-top:8px;text-align:center" class="captured" id="capturedWhite"></div>
+      </div>
+
+      <!-- Black's board (right) -->
+      <div class="board-wrap" id="blackWrap">
+        <div class="mini-title">Black View</div>
+        <div id="boardBlack" class="board" aria-label="black board"></div>
+        <div style="margin-top:8px;text-align:center" class="captured" id="capturedBlack"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="players">
+        <div class="player">
+          <div class="label">Player White</div>
+          <div id="p1" class="id">(local)</div>
+          <div id="clockW" style="font-weight:900;margin-top:6px">5:00</div>
+        </div>
+        <div class="player">
+          <div class="label">Player Black</div>
+          <div id="p2" class="id">(local)</div>
+          <div id="clockB" style="font-weight:900;margin-top:6px">5:00</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <button id="flipBtn" class="secondary">Flip Boards</button>
+          <button id="offerDraw" class="secondary">Offer Draw</button>
+          <button id="resign" class="secondary">Resign</button>
+        </div>
+        <div>
+          <button id="rematchBtn">Request Rematch</button>
+        </div>
+      </div>
+
+      <div id="rematchPrompt">
+        Opponent requests rematch — <button id="acceptRematch">Accept</button>
+      </div>
+      <div style="margin-top:8px;font-size:12px;opacity:.85">Multiplayer: <span id="mpStatus">offline / local</span></div>
+    </div>
+  </div>
+
+  <canvas id="fx" style="position:fixed;inset:0;pointer-events:none;z-index:9999"></canvas>
+
+<script>
+/*
+  HOW IT WORKS:
+  - If MULTIPLAYER_WS_URL is a non-empty string, the client will attempt to connect to that WebSocket server and
+    send/receive JSON messages { type:'move', data: moveObj } and { type:'rematch', data:... }.
+  - If empty, it falls back to localStorage 'chess_move' and 'chess_rematch' events for tab-to-tab sync.
+  - Also provides two boards (White & Black) rendered offline; clicking on either board applies move to the same game state
+    and re-renders both boards — so you can pass-and-play on one device.
+  - To integrate with your server later: implement a server that relays the JSON messages between players.
+*/
+
+/* ========== CONFIG ========== */
+// set your WS server here to enable internet multiplayer (without Pi SDK).
+// Example: const MULTIPLAYER_WS_URL = "wss://your-server.example";
+const MULTIPLAYER_WS_URL = ""; // <-- set to wss://... for internet play
+
+const START_CLOCK = 300; // seconds (5:00)
+const REMATCH_AUTO_CANCEL = 5; // seconds
+
+/* ========== LIB: minimal chess logic using chess.js (embedded small copy) ========== */
+/* We're using a very small included chess engine to avoid CDN dependency.
+   This is a minified excerpt of chess.js behavior required for moves/getters.
+   For more complete behavior you can include chess.js library instead.
+   For brevity here we'll dynamically load chess.js from CDN if not present.
+*/
+function ensureChessLib(cb){
+  if(window.Chess) return cb();
+  const s = document.createElement('script');
+  s.src = "https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.13.4/chess.min.js";
+  s.onload = cb; document.head.appendChild(s);
+}
+
+/* ========== UI, state and utilities ========== */
+const boardW = document.getElementById('boardWhite');
+const boardB = document.getElementById('boardBlack');
+const capturedWhite = document.getElementById('capturedWhite');
+const capturedBlack = document.getElementById('capturedBlack');
+const rematchPrompt = document.getElementById('rematchPrompt');
+const rematchBtn = document.getElementById('rematchBtn');
+const rematchAccept = document.getElementById('acceptRematch');
+const mpStatus = document.getElementById('mpStatus');
+const flipBtn = document.getElementById('flipBtn');
+const resignBtn = document.getElementById('resign');
+const offerDrawBtn = document.getElementById('offerDraw');
+const clockWEl = document.getElementById('clockW');
+const clockBEl = document.getElementById('clockB');
+const confettiCanvas = document.getElementById('fx');
+
+let game = null;
+let flipped = false;
+let selectedSquare = null; // for click-to-move
+let ws = null;
+let usingWS = false;
+let clocks = { w: START_CLOCK, b: START_CLOCK };
+let clockInterval = null;
+let lastTick = performance.now();
+let gameOver = false;
+
+/* Sound helpers (small beeps) */
+const SND = (()=>{ let ctx; function beep(freq=600,d=0.07){ try{ ctx = ctx||new (window.AudioContext||window.webkitAudioContext)(); const o=ctx.createOscillator(), g=ctx.createGain(); o.type='sine'; o.frequency.value=freq; g.gain.value=0.06; o.connect(g); g.connect(ctx.destination); o.start(); setTimeout(()=>o.stop(), d*1000); }catch(e){} } return { move:()=>beep(640,0.06), capture:()=>beep(260,0.08), check:()=>beep(880,0.12), win:()=>{beep(880,0.12); setTimeout(()=>beep(988,0.12),140); setTimeout(()=>beep(1175,0.12),280);} }; })();
+
+/* Confetti (simple) */
+const Confetti = (()=>{
+  const c = confettiCanvas, x = c.getContext('2d'); let parts=[], running=false;
+  function resize(){ c.width = innerWidth; c.height = innerHeight; }
+  addEventListener('resize', resize); resize();
+  function burst(n=100){
+    parts = []; for(let i=0;i<n;i++){
+      parts.push({ x: c.width/2, y: c.height*0.2, vx:(Math.random()*2-1)*6, vy:(Math.random()*-6-1), s:Math.random()*6+4, a:Math.random()*Math.PI, col:`hsl(${Math.random()*360},80%,60%)`});
+    }
+    if(!running){ running=true; requestAnimationFrame(loop); }
+  }
+  function loop(){
+    x.clearRect(0,0,c.width,c.height);
+    for(const p of parts){ p.vy += 0.25; p.x += p.vx; p.y += p.vy; p.a += 0.2; x.save(); x.translate(p.x,p.y); x.rotate(p.a); x.fillStyle=p.col; x.fillRect(-p.s/2,-p.s/2,p.s,p.s); x.restore(); }
+    parts = parts.filter(p => p.y < c.height+50);
+    if(parts.length) requestAnimationFrame(loop); else running=false;
+  }
+  return { burst };
+})();
+
+/* Helper: create 8x8 grid in a board element */
+function createEmptyBoard(boardEl){
+  boardEl.innerHTML = '';
+  const coords = [];
+  for(let r=8;r>=1;r--){
+    for(let c=0;c<8;c++){
+      const s = document.createElement('div');
+      s.className = 'sq sq-cell';
+      s.dataset.square = 'abcdefgh'[c] + r;
+      s.style.userSelect = 'none';
+      boardEl.appendChild(s);
+    }
+  }
+}
+
+/* Render function for both views */
+function renderBoards(){
+  // fill squares
+  const fill = (boardEl, perspective) => {
+    boardEl.querySelectorAll('.sq').forEach(s => s.innerHTML='');
+    const squares = [...boardEl.querySelectorAll('.sq')];
+    // if flipped, reverse order
+    const order = perspective === 'white' ? squares : [...squares].reverse();
+    for(const sq of order){
+      const alg = sq.dataset.square;
+      const piece = game.get(alg);
+      if(piece){
+        const div = document.createElement('div');
+        div.className = 'piece ' + (piece.color==='w' ? 'w' : 'b') + piece.type.toUpperCase();
+        sq.appendChild(div);
+      }
+    }
+  };
+  fill(boardW, 'white');
+  fill(boardB, 'black');
+  // update captured
+  updateCapturedDisplays();
+  // clocks & status
+  updateClockDisplays();
+}
+
+/* Fill square colors (light/dark) - done once */
+function colorSquares(boardEl, flipView=false){
+  const squares = boardEl.querySelectorAll('.sq');
+  // squares already created in natural order a8..h1
+  [...squares].forEach((el, idx) => {
+    const r = Math.floor(idx/8), c = idx%8; // 0..7
+    const isDark = (r + c) % 2 === 1;
+    el.className = 'sq ' + (isDark ? 'dark' : 'light');
+    el.style.cursor = 'pointer';
+  });
+}
+
+/* Captured pieces display */
+function updateCapturedDisplays(){
+  const caps = { w:[], b:[] };
+  // start from initial pieces and subtract board pieces to get captures
+  const initial = ['r','n','b','q','k','b','n','r', 'p','p','p','p','p','p','p','p',
+                   'P','P','P','P','P','P','P','P', 'R','N','B','Q','K','B','N','R'];
+  // easier: traverse history via game.history({ verbose:true })
+  const hist = game.history({ verbose:true });
+  const live = {};
+  for(const sq of game.SQUARES){ const p = game.get(sq); if(p){ const key = (p.color==='w' ? p.type.toUpperCase() : p.type.toLowerCase()); live[key] = (live[key]||0)+1; } }
+  // now count captures by scanning history captures
+  // simpler approach: rebuild captured from moves with captured field
+  const capturedList = [];
+  // chess.js doesn't expose captured list directly; compute by counting pieces missing
+  // create counts of initial pieces
+  const countInitial = s => s.reduce((acc,p)=>{ acc[p]=(acc[p]||0)+1; return acc; }, {});
+  const initialCount = countInitial(initial);
+  // count current pieces
+  const curList = [];
+  for(const sq of game.SQUARES){ const p = game.get(sq); if(p){ curList.push(p.color==='w' ? p.type.toUpperCase() : p.type.toLowerCase()); } }
+  const curCount = countInitial(curList);
+  const capsArr = [];
+  for(const k in initialCount){
+    const before = initialCount[k]||0, now = curCount[k]||0;
+    const missing = before - now;
+    for(let i=0;i<missing;i++) capsArr.push(k);
+  }
+  // Separate which side captured which: pieces missing from white mean black captured them
+  capturedWhite.innerHTML = ''; capturedBlack.innerHTML = '';
+  // Determine counts per uppercase (white missing) or lowercase (black missing)
+  // For simplicity, we will use game.history to gather captured pieces:
+  const h = game.history({ verbose:true });
+  const capsWhite = []; const capsBlack = [];
+  for(const mv of h){
+    if(mv.captured){
+      const symbol = mv.captured;
+      if(mv.color === 'w'){ // white moved and captured black piece
+        capsWhite.push(symbol.toLowerCase());
+      } else {
+        capsBlack.push(symbol.toUpperCase());
+      }
+    }
+  }
+  // render capsWhite as white captured (pieces captured by white)
+  for(const p of capsWhite){
+    const d = document.createElement('div'); d.className = 'piece ' + ('w' + p.toUpperCase()); d.style.width='28px'; d.style.height='28px';
+    capturedWhite.appendChild(d);
+  }
+  for(const p of capsBlack){
+    const d = document.createElement('div'); d.className = 'piece ' + ('b' + p.toUpperCase()); d.style.width='28px'; d.style.height='28px';
+    capturedBlack.appendChild(d);
+  }
+}
+
+/* Clock helpers */
+function formatTime(s){ const m = Math.floor(s/60), sec = Math.floor(s%60); return `${m}:${String(sec).padStart(2,'0')}`; }
+function updateClockDisplays(){ clockWEl.textContent = formatTime(clocks.w); clockBEl.textContent = formatTime(clocks.b); }
+function resetClocks(){ clocks.w = START_CLOCK; clocks.b = START_CLOCK; updateClockDisplays(); }
+
+/* Clock ticker when game active */
+function startClock(){
+  stopClock();
+  lastTick = performance.now();
+  clockInterval = setInterval(()=>{
+    if(gameOver) return;
+    const now = performance.now(); const dt = (now - lastTick)/1000; lastTick = now;
+    const side = game.turn(); // 'w' or 'b'
+    clocks[side] -= dt;
+    if(clocks[side] <= 0){
+      clocks[side] = 0;
+      gameOver = true;
+      updateClockDisplays();
+      const winner = side === 'w' ? 'b' : 'w';
+      SND.win(); Confetti.burst(140);
+      showRematchUI();
+    } else {
+      // ticking sound under 10s
+      if(Math.floor(clocks[side]) <= 10) SND.move();
+      updateClockDisplays();
+    }
+  }, 250);
+}
+function stopClock(){ if(clockInterval){ clearInterval(clockInterval); clockInterval = null; } }
+
+/* ========== Local UI Interaction ========== */
+function onSquareClicked(square, fromView){
+  // simple click-to-move: select then move
+  if(!selectedSquare){
+    // only allow selecting your side's pieces if using offline dual-board? keep it permissive
+    const piece = game.get(square);
+    if(piece && piece.color === 'w' && fromView === 'white' || piece && piece.color==='b' && fromView==='black' || !usingWS){
+      selectedSquare = square;
+      highlightLegalFrom(square);
+    } else {
+      // Visual select still allowed for pass-and-play
+      selectedSquare = square;
+      highlightLegalFrom(square);
+    }
+    return;
+  }
+  // attempt move
+  const move = game.move({ from: selectedSquare, to: square, promotion: 'q' });
+  selectedSquare = null; clearHighlights();
+  if(move){
+    SND.move();
+    renderBoards();
+    sendMoveToRemote(move);
+    checkGameEnd();
+  } else {
+    // invalid move -> clear selection
+    selectedSquare = null; clearHighlights();
+  }
+}
+
+function highlightLegalFrom(square){
+  clearHighlights();
+  const moves = game.moves({ square, verbose:true });
+  const allSquares = [...boardW.querySelectorAll('.sq')];
+  for(const m of moves){
+    const elW = boardW.querySelector(`.sq[data-square="${m.to}"]`);
+    if(elW){ elW.classList.add(m.captured ? 'cap' : 'hint'); }
+    const elB = boardB.querySelector(`.sq[data-square="${m.to}"]`);
+    if(elB){ elB.classList.add(m.captured ? 'cap' : 'hint'); }
+  }
+  const sqW = boardW.querySelector(`.sq[data-square="${square}"]`);
+  const sqB = boardB.querySelector(`.sq[data-square="${square}"]`);
+  if(sqW) sqW.classList.add('sel');
+  if(sqB) sqB.classList.add('sel');
+}
+
+function clearHighlights(){
+  document.querySelectorAll('.sq').forEach(el=> el.classList.remove('sel','hint','cap'));
+}
+
+/* Apply board cell bindings */
+function hookBoardClicks(){
+  boardW.querySelectorAll('.sq').forEach(sq => {
+    sq.onclick = () => onSquareClicked(sq.dataset.square, 'white');
+  });
+  boardB.querySelectorAll('.sq').forEach(sq => {
+    sq.onclick = () => onSquareClicked(sq.dataset.square, 'black');
+  });
+}
+
+/* ========== Multiplayer: WebSocket / localStorage fallback ========== */
+function initMultiplayer(){
+  if(MULTIPLAYER_WS_URL){
+    try {
+      ws = new WebSocket(MULTIPLAYER_WS_URL);
+      ws.onopen = () => { usingWS = true; mpStatus.textContent = 'connected (ws)'; };
+      ws.onclose = ()=>{ usingWS = false; mpStatus.textContent = 'disconnected (ws) — using local'; };
+      ws.onerror = ()=>{ usingWS = false; mpStatus.textContent = 'ws error — using local'; };
+      ws.onmessage = (ev)=>{
+        try{
+          const m = JSON.parse(ev.data);
+          handleRemoteMessage(m);
+        }catch(e){}
+      };
+    } catch(e){ usingWS = false; mpStatus.textContent = 'ws failed — using local'; }
+  } else {
+    usingWS = false;
+    mpStatus.textContent = 'offline / local';
+    // localStorage listener
+    window.addEventListener('storage', (e)=>{
+      if(e.key === 'chess_move'){
+        const m = JSON.parse(e.newValue);
+        if(m && m.signed !== localSignature()){ // ignore own writes
+          applyRemoteMove(m.move);
+        }
+      }
+      if(e.key === 'chess_rematch'){
+        const data = JSON.parse(e.newValue);
+        if(data && data.signed !== localSignature()){
+          showRematchPrompt();
+        }
+      }
+    });
+  }
+}
+
+/* Send move to remote (WS or localStorage) */
+function sendMoveToRemote(moveObj){
+  const payload = { type:'move', move: moveObj, fen: game.fen() };
+  if(usingWS && ws && ws.readyState === WebSocket.OPEN){
+    ws.send(JSON.stringify(payload));
+  } else {
+    localStorage.setItem('chess_move', JSON.stringify({ move: moveObj, fen: game.fen(), signed: localSignature() }));
+  }
+}
+
+/* Handle incoming message structure */
+function handleRemoteMessage(msg){
+  if(!msg || !msg.type) return;
+  if(msg.type === 'move'){
+    applyRemoteMove(msg.move);
+  } else if(msg.type === 'rematch'){
+    showRematchPrompt();
+  } else if(msg.type === 'reset'){
+    resetLocalGame();
+  }
+}
+
+/* Apply remote move safely */
+function applyRemoteMove(move){
+  try{
+    // try to play same move on local game
+    // chess.js can accept algebraic object; move already from chess.js format
+    const play = game.move({ from: move.from, to: move.to, promotion: move.promotion || 'q' });
+    if(play){
+      SND.move();
+      renderBoards();
+      checkGameEnd();
+    }
+  }catch(e){
+    console.warn('Failed to apply remote move', e);
+  }
+}
+
+/* Send rematch request */
+function requestRematch(){
+  const payload = { type:'rematch', time:Date.now(), signed: localSignature() };
+  if(usingWS && ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(payload));
+  else localStorage.setItem('chess_rematch', JSON.stringify(payload));
+  // also show local rematch UI for requester
+  showRematchPrompt(true);
+}
+
+/* Show rematch prompt to acceptor. If initiator=true, show on both so UI consistent */
+let rematchTimer = null;
+function showRematchPrompt(initiator=false){
+  rematchPrompt.style.display = 'block';
+  rematchBtn.style.display = initiator ? 'none' : '';
+  let remaining = REMATCH_AUTO_CANCEL;
+  rematchPrompt.innerHTML = `Opponent requests rematch — <button id="acceptRematchBtn">Accept</button> <button id="declineRematchBtn">Decline</button> <div style="font-size:12px;margin-top:6px">Auto-cancel in <span id="remRemain">${remaining}</span>s</div>`;
+  document.getElementById('acceptRematchBtn').onclick = ()=>{ sendRematchAccept(); hideRematchPrompt(); };
+  document.getElementById('declineRematchBtn').onclick = ()=>{ hideRematchPrompt(); };
+  clearTimeout(rematchTimer);
+  rematchTimer = setInterval(()=>{ remaining--; if(remaining<=0){ hideRematchPrompt(); clearInterval(rematchTimer); } else document.getElementById('remRemain').textContent = remaining; }, 1000);
+}
+function hideRematchPrompt(){ rematchPrompt.style.display='none'; rematchBtn.style.display=''; if(rematchTimer){ clearInterval(rematchTimer); rematchTimer=null; } }
+
+/* Accept rematch: send reset to remote and reset locally */
+function sendRematchAccept(){
+  const payload = { type:'reset' };
+  if(usingWS && ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(payload));
+  else localStorage.setItem('chess_reset', JSON.stringify({ signed: localSignature(), time: Date.now() }));
+  resetLocalGame();
+}
+
+window.addEventListener('storage', (e)=>{
+  if(e.key === 'chess_reset'){
+    const data = JSON.parse(e.newValue);
+    if(data && data.signed !== localSignature()) resetLocalGame();
+  }
+});
+
+/* Local signature to avoid applying own storage events */
+function localSignature(){ return (window.navigator.userAgent || '') + '::' + location.href; }
+
+/* ========== Game lifecycle helpers ========== */
+function checkGameEnd(){
+  if(game.game_over()){
+    gameOver = true;
+    SND.win();
+    Confetti.burst(120);
+    // show rematch
+    showRematchUI();
+    stopClock();
+  } else {
+    startClock();
+  }
+}
+
+function showRematchUI(){
+  rematchBtn.style.display = '';
+  showRematchPrompt();
+}
+
+/* reset game */
+function resetLocalGame(){
+  game.reset();
+  selectedSquare = null;
+  gameOver = false;
+  resetClocks();
+  renderBoards();
+}
+
+/* ================= Initialization ================= */
+ensureChessLib(()=> {
+  game = new Chess();
+  // create UI boards
+  createEmptyBoard(boardW); createEmptyBoard(boardB);
+  colorSquares(boardW); colorSquares(boardB);
+  hookBoardClicks = hookBoardClicks || function(){};
+  // attach click handlers
+  boardW.querySelectorAll('.sq').forEach(s => s.addEventListener('click', ()=> onSquareClickedInterface(s.dataset.square,'white')));
+  boardB.querySelectorAll('.sq').forEach(s => s.addEventListener('click', ()=> onSquareClickedInterface(s.dataset.square,'black')));
+  renderBoards();
+  resetClocks();
+  initMultiplayer();
+});
+
+/* wrapper to unify clicks from both boards: */
+function onSquareClickedInterface(square, view){
+  // For offline local dual-board: allow white to move on left and black on right separately.
+  // We'll map 'view' to prefer piece color selection but still accept any valid move.
+  if(!selectedSquare){
+    const piece = game.get(square);
+    if(piece){
+      // prefer selecting own color if view matches
+      if((view==='white' && piece.color==='w') || (view==='black' && piece.color==='b') ){
+        selectedSquare = square; highlightLegalFrom(square); return;
+      } else {
+        // still allow selection, but highlight legal
+        selectedSquare = square; highlightLegalFrom(square); return;
+      }
+    }
+    // no piece, nothing to select
+    return;
+  } else {
+    // attempt move
+    const mv = game.move({ from:selectedSquare, to: square, promotion:'q' });
+    selectedSquare = null; clearHighlights();
+    if(mv){
+      SND.move();
+      renderBoards();
+      sendMoveToRemote(mv);
+      checkGameEnd();
+    }
+  }
+}
+
+/* flip boards control */
+document.getElementById('flipBtn').addEventListener('click', ()=>{
+  flipped = !flipped;
+  // simple visual flip by reversing DOM order of squares
+  // for brevity: just re-render (sprite positions are data-square dependent)
+  renderBoards();
+});
+
+/* rematch button */
+rematchBtn.addEventListener('click', ()=> requestRematch());
+rematchAccept.addEventListener('click', ()=>{ sendRematchAccept(); hideRematchPrompt(); });
+
+/* resign & offer draw */
+resignBtn.addEventListener('click', ()=>{
+  if(gameOver) return;
+  gameOver = true;
+  SND.win(); Confetti.burst(90);
+  showRematchUI();
+});
+offerDrawBtn.addEventListener('click', ()=>{ alert('Offer draw (placeholder)'); });
+
+/* ========== Initial render glue ========== */
+/* createEmptyBoard added sq class names are 'sq' — but earlier colorSquares expects 'sq' class,
+   ensure initial coloring applied after DOM created. We already called colorSquares above. */
+function initBindingsAfterLib(){
+  // re-hook board click listeners since we might've re-created elements
+  boardW.querySelectorAll('.sq').forEach(sq => sq.onclick = ()=> onSquareClickedInterface(sq.dataset.square,'white'));
+  boardB.querySelectorAll('.sq').forEach(sq => sq.onclick = ()=> onSquareClickedInterface(sq.dataset.square,'black'));
+  renderBoards();
+}
+
+/* slight delay to ensure chess.js loaded and boards created */
+setTimeout(()=>{ if(window.Chess) initBindingsAfterLib(); }, 300);
+
+/* Expose some debug API on window */
+window.ChessArena = {
+  requestRematch,
+  resetLocalGame,
+  setWsUrl: function(url){
+    // reconnect logic simple
+    if(ws) ws.close();
+    if(url) { location.reload(); } // easiest: reload with new config
+  }
+};
+</script>
+</body>
+</html>
