@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chess Arena for Pi</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      margin: 0;
+      background: #2e2e2e;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    #gameContainer {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .playerPanel {
+      text-align: center;
+    }
+
+    .captured {
+      min-height: 40px;
+    }
+
+    #board {
+      width: 480px;
+      height: 480px;
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      grid-template-rows: repeat(8, 1fr);
+      border: 4px solid #4a2c2a;
+    }
+
+    .square {
+      width: 60px;
+      height: 60px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 0;
+    }
+
+    .light { background: #f0d9b5; }
+    .dark  { background: #b58863; }
+
+    .piece {
+      width: 90%;
+      height: 90%;
+      background-image: url("pieces.png");
+      background-size: 600% 200%; /* 6 cols x 2 rows */
+    }
+
+    /* ivory row (top of sprite) */
+    .wK { background-position: 0% 0%; }
+    .wQ { background-position: 20% 0%; }
+    .wR { background-position: 40% 0%; }
+    .wB { background-position: 60% 0%; }
+    .wN { background-position: 80% 0%; }
+    .wP { background-position: 100% 0%; }
+
+    /* ebony row (bottom of sprite) */
+    .bK { background-position: 0% 100%; }
+    .bQ { background-position: 20% 100%; }
+    .bR { background-position: 40% 100%; }
+    .bB { background-position: 60% 100%; }
+    .bN { background-position: 80% 100%; }
+    .bP { background-position: 100% 100%; }
+
+    #controls {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #6b3a2e;
+      color: #fff;
+    }
+
+    button:hover { background: #874d3e; }
+
+    #rematchPrompt {
+      display: none;
+      margin-top: 10px;
+      padding: 10px;
+      background: #444;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div id="gameContainer">
+    <div class="playerPanel" id="blackPanel">
+      <div id="blackName">Player Black</div>
+      <div id="blackTimer">05:00</div>
+      <div class="captured" id="blackCaptured"></div>
+    </div>
+
+    <div id="board"></div>
+
+    <div class="playerPanel" id="whitePanel">
+      <div id="whiteName">Player White</div>
+      <div id="whiteTimer">05:00</div>
+      <div class="captured" id="whiteCaptured"></div>
+    </div>
+
+    <div id="controls">
+      <button onclick="offerDraw()">Offer Draw</button>
+      <button onclick="resign()">Resign</button>
+      <button onclick="flipBoard()">Flip Board</button>
+      <button onclick="requestRematch()">Rematch</button>
+    </div>
+
+    <div id="rematchPrompt">
+      Opponent requests a rematch!
+      <button onclick="acceptRematch()">Accept</button>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.13.4/chess.min.js"></script>
+  <script>
+    const game = new Chess();
+    const boardEl = document.getElementById("board");
+
+    let flipped = false;
+    let rematchTimeout;
+
+    // build board UI
+    function buildBoard() {
+      boardEl.innerHTML = "";
+      for (let r = 7; r >= 0; r--) {
+        for (let c = 0; c < 8; c++) {
+          const sq = document.createElement("div");
+          sq.classList.add("square");
+          sq.classList.add((r + c) % 2 === 0 ? "light" : "dark");
+          sq.dataset.square = "abcdefgh"[c] + (r + 1);
+          sq.addEventListener("click", () => handleSquareClick(sq.dataset.square));
+          boardEl.appendChild(sq);
+        }
+      }
+      render();
+    }
+
+    let selected = null;
+    function handleSquareClick(square) {
+      if (!selected) {
+        selected = square;
+      } else {
+        const move = game.move({ from: selected, to: square, promotion: "q" });
+        if (move) {
+          updateCaptured(move);
+          render();
+          syncMove(move);
+          checkEnd();
+        }
+        selected = null;
+      }
+    }
+
+    function render() {
+      document.querySelectorAll(".square").forEach(sq => sq.innerHTML = "");
+      game.SQUARES.forEach(square => {
+        const piece = game.get(square);
+        if (piece) {
+          const div = document.createElement("div");
+          div.classList.add("piece", (piece.color === "w" ? "w" : "b") + piece.type.toUpperCase());
+          document.querySelector(`.square[data-square="${square}"]`).appendChild(div);
+        }
+      });
+    }
+
+    // Captured pieces
+    function updateCaptured(move) {
+      if (move.captured) {
+        const capDiv = document.createElement("div");
+        capDiv.classList.add("piece", (move.color === "w" ? "b" : "w") + move.captured.toUpperCase());
+        if (move.color === "w") {
+          document.getElementById("blackCaptured").appendChild(capDiv);
+        } else {
+          document.getElementById("whiteCaptured").appendChild(capDiv);
+        }
+      }
+    }
+
+    // Multiplayer sync placeholder (localStorage simulates opponent view)
+    function syncMove(move) {
+      localStorage.setItem("chessMove", JSON.stringify(move));
+    }
+    window.addEventListener("storage", e => {
+      if (e.key === "chessMove") {
+        const move = JSON.parse(e.newValue);
+        game.move(move);
+        updateCaptured(move);
+        render();
+        checkEnd();
+      }
+    });
+
+    // Rematch flow
+    function requestRematch() {
+      localStorage.setItem("rematchRequest", Date.now());
+    }
+    window.addEventListener("storage", e => {
+      if (e.key === "rematchRequest") {
+        document.getElementById("rematchPrompt").style.display = "block";
+        clearTimeout(rematchTimeout);
+        rematchTimeout = setTimeout(() => {
+          document.getElementById("rematchPrompt").style.display = "none";
+        }, 5000);
+      }
+    });
+    function acceptRematch() {
+      document.getElementById("rematchPrompt").style.display = "none";
+      resetGame();
+    }
+
+    // Other controls
+    function offerDraw() { alert("Draw offered (placeholder)"); }
+    function resign() { alert("Player resigned (placeholder)"); }
+    function flipBoard() { flipped = !flipped; render(); }
+
+    function checkEnd() {
+      if (game.game_over()) {
+        alert("Game Over");
+      }
+    }
+
+    function resetGame() {
+      game.reset();
+      document.getElementById("whiteCaptured").innerHTML = "";
+      document.getElementById("blackCaptured").innerHTML = "";
+      render();
+    }
+
+    buildBoard();
+  </script>
+</body>
+</html>
