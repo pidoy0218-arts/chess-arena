@@ -3,151 +3,99 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chess Arena for PI</title>
+  <title>Login – Chess Arena Pi</title>
   <style>
     body {
-      margin: 0;
+      background: #111;
+      color: #fff;
+      font-family: Arial, sans-serif;
       display: flex;
       justify-content: center;
       align-items: center;
       height: 100vh;
-      background: #480082; /* purple background */
-      color: #ffd700;      /* Gold text */
-      font-family: Arial, sans-serif;
-      text-align: center;
+      margin: 0;
+      flex-direction: column;
     }
     h1 {
-      font-size: 2.25em;
-      margin: 0.5em 0;
+      color: gold;
+      margin-bottom: 20px;
     }
-    .knight-circle {
-      width: 220px;
-      height: 220px;
-      background: #ffd700; /* Gold circle */
+    #status-dot {
+      width: 14px;
+      height: 14px;
       border-radius: 50%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      margin: 0 auto 20px;
-      animation: bounce 1s infinite alternate;
+      margin-bottom: 10px;
     }
-    .knight-circle span {
-      font-size: 14em;
-      color: #676569; /* iron gray knight */
+    #status-text {
+      font-size: 14px;
+      margin-bottom: 20px;
+      opacity: 0.8;
     }
-    @keyframes bounce {
-      from { transform: translateY(0); }
-      to { transform: translateY(-20px); }
-    }
-    .btn {
-      display: inline-block;
+    button {
+      background: #2196f3;
+      color: white;
+      font-size: 18px;
       padding: 12px 24px;
-      margin-top: 20px;
-      font-size: 1em;
-      font-weight: bold;
-      color: #480082;     /* Purple text */
-      background: #FFD700; /* Gold button */
       border: none;
-      border-radius: 12px;
+      border-radius: 8px;
       cursor: pointer;
-      transition: 0.3s;
+      transition: transform 0.2s;
     }
-    .btn:hover {
+    button:hover {
       transform: scale(1.05);
     }
-    /* Status dot */
-    .status {
-      margin-top: 15px;
-      font-size: 0.9em;
-      color: white;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 8px;
-    }
-    .dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: red; /* default red */
-    }
   </style>
-
-  <!-- Attempt to load Pi SDK -->
-  <script>
-    (function() {
-      const piScript = document.createElement("script");
-      piScript.src = "https://sdk.minepi.com/pi-sdk.js";
-      piScript.onload = () => {
-        window.piSdkLoaded = true;
-        updateStatus(true);
-      };
-      piScript.onerror = () => {
-        window.piSdkLoaded = false;
-        updateStatus(false);
-      };
-      document.head.appendChild(piScript);
-    })();
-  </script>
 </head>
 <body>
-  <div>
-    <div class="knight-circle">
-      <span>♞</span>
-    </div>
-    <h1>CHESS ARENA <span style="color: white;">for</span> PI</h1>
-    <button class="btn" onclick="login()">Login</button>
-    <div class="status">
-      <div id="sdkDot" class="dot"></div>
-      <span id="sdkStatus">Checking Pi SDK...</span>
-    </div>
-  </div>
+  <h1>♞ Chess Arena Pi</h1>
+
+  <div id="status-dot"></div>
+  <div id="status-text"></div>
+
+  <button id="loginBtn">Login</button>
 
   <script>
-    function updateStatus(isReady) {
-      const dot = document.getElementById("sdkDot");
-      const text = document.getElementById("sdkStatus");
-      if (isReady && window.Pi) {
+    const dot = document.getElementById("status-dot");
+    const text = document.getElementById("status-text");
+    const loginBtn = document.getElementById("loginBtn");
+
+    let sdkAvailable = false;
+
+    function checkPiSDK() {
+      if (window.Pi) {
+        sdkAvailable = true;
         dot.style.background = "limegreen";
-        text.textContent = "Pi SDK detected";
+        text.textContent = "Live Mode (Pi SDK detected)";
       } else {
+        sdkAvailable = false;
         dot.style.background = "red";
-        text.textContent = "Pi SDK not found (fallback mode)";
+        text.textContent = "Test Mode (Pi SDK not detected)";
       }
+      // Auto-refresh every 2s
+      setTimeout(checkPiSDK, 2000);
     }
 
-    async function login() {
-      if (window.piSdkLoaded && window.Pi) {
-        try {
-          Pi.init({ version: "2.0" });
-          const user = await Pi.authenticate(["username"], onIncompletePaymentFound);
-          alert("Welcome, " + user.username + "!");
-          window.location.href = "menu.html";
-        } catch (err) {
-          console.error(err);
-          alert("Pi login failed, using fallback login.");
-          fallbackLogin();
-        }
+    checkPiSDK();
+
+    loginBtn.addEventListener("click", () => {
+      if (sdkAvailable) {
+        // Real Pi login flow
+        Pi.authenticate(["username"], (authResult) => {
+          console.log("Login success:", authResult);
+          alert("Welcome " + authResult.user.username);
+          window.location.href = "menu.html"; // Redirect after login
+        });
       } else {
-        fallbackLogin();
-      }
-    }
-
-    function fallbackLogin() {
-      alert("Local login successful. (Pi SDK not detected)");
-      window.location.href = "menu.html";
-    }
-
-    function onIncompletePaymentFound(payment) {
-      console.log("Incomplete payment:", payment);
-    }
-
-    // Fallback status if Pi SDK never loads
-    window.addEventListener("load", () => {
-      if (typeof window.piSdkLoaded === "undefined") {
-        updateStatus(false);
+        // Simulated test login
+        const fakeUser = { username: "Guest" + Math.floor(Math.random() * 1000) };
+        console.log("Test login:", fakeUser);
+        alert("Test Login as " + fakeUser.username);
+        window.location.href = "menu.html"; // Redirect after test login
       }
     });
   </script>
+
+  <!-- Placeholder for Pi SDK script -->
+  <!-- <script src="https://sdk.minepi.com/pi-sdk.js"></script> -->
 </body>
 </html>
