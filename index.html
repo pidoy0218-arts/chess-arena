@@ -71,21 +71,24 @@
       border-radius: 50%;
       background: red; /* default red */
     }
-    /* Pulse animation */
-    @keyframes pulseGreen {
-      0% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.4); opacity: 0.7; }
-      100% { transform: scale(1); opacity: 1; }
-    }
-    @keyframes blinkRed {
-      0% { opacity: 1; }
-      50% { opacity: 0.3; }
-      100% { opacity: 1; }
-    }
   </style>
 
-  <!-- Explicitly load Pi SDK -->
-  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+  <!-- Attempt to load Pi SDK -->
+  <script>
+    (function() {
+      const piScript = document.createElement("script");
+      piScript.src = "https://sdk.minepi.com/pi-sdk.js";
+      piScript.onload = () => {
+        window.piSdkLoaded = true;
+        updateStatus(true);
+      };
+      piScript.onerror = () => {
+        window.piSdkLoaded = false;
+        updateStatus(false);
+      };
+      document.head.appendChild(piScript);
+    })();
+  </script>
 </head>
 <body>
   <div>
@@ -104,19 +107,17 @@
     function updateStatus(isReady) {
       const dot = document.getElementById("sdkDot");
       const text = document.getElementById("sdkStatus");
-      if (isReady) {
+      if (isReady && window.Pi) {
         dot.style.background = "limegreen";
-        dot.style.animation = "pulseGreen 1s infinite";
         text.textContent = "Pi SDK detected";
       } else {
         dot.style.background = "red";
-        dot.style.animation = "blinkRed 1s infinite";
         text.textContent = "Pi SDK not found (fallback mode)";
       }
     }
 
     async function login() {
-      if (window.Pi) {
+      if (window.piSdkLoaded && window.Pi) {
         try {
           Pi.init({ version: "2.0" });
           const user = await Pi.authenticate(["username"], onIncompletePaymentFound);
@@ -124,22 +125,28 @@
           window.location.href = "menu.html";
         } catch (err) {
           console.error(err);
-          alert("Pi login failed, falling back to local login.");
-          window.location.href = "menu.html";
+          alert("Pi login failed, using fallback login.");
+          fallbackLogin();
         }
       } else {
-        alert("Local login successful. (Pi SDK not detected)");
-        window.location.href = "menu.html";
+        fallbackLogin();
       }
+    }
+
+    function fallbackLogin() {
+      alert("Local login successful. (Pi SDK not detected)");
+      window.location.href = "menu.html";
     }
 
     function onIncompletePaymentFound(payment) {
       console.log("Incomplete payment:", payment);
     }
 
-    // Run check once page loads
+    // Fallback status if Pi SDK never loads
     window.addEventListener("load", () => {
-      updateStatus(!!window.Pi);
+      if (typeof window.piSdkLoaded === "undefined") {
+        updateStatus(false);
+      }
     });
   </script>
 </body>
