@@ -9,7 +9,7 @@ body { margin:0; font-family:Arial, sans-serif; display:flex; height:100vh; }
 .cart, .items { padding:10px; box-sizing:border-box; }
 .cart { width:50%; background:#f9f9f9; overflow-y:auto; }
 .items { width:50%; background:#fff; overflow-y:auto; display:flex; flex-direction:column; }
-.item-btn { padding:20px; margin:5px 0; font-size:20px; border:none; border-radius:8px; cursor:pointer; }
+.item-btn { padding:20px; margin:5px 0; font-size:20px; border:none; border-radius:8px; color:#fff; cursor:pointer; }
 .cart-item { display:flex; align-items:center; justify-content:space-between; padding:8px; margin:4px 0; background:#eee; border-radius:6px; }
 .cancel-btn { background:#999; color:#fff; border:none; border-radius:4px; padding:2px 6px; margin-right:8px; cursor:pointer; font-size:14px; }
 .footer { position:absolute; bottom:0; left:0; width:100%; background:#222; color:#fff; padding:10px; display:flex; flex-wrap:wrap; align-items:center; }
@@ -30,18 +30,19 @@ body { margin:0; font-family:Arial, sans-serif; display:flex; height:100vh; }
   z-index: 9999;
   padding: 15px;
   flex-direction: column;
-  overflow-y: auto;
+  overflow-y:auto;
 }
+
 .supervisor-screen h2 { margin-top:0; }
-.log-box, .item-box, .zhistory-box { max-height:250px; overflow-y:auto; background:#fff; padding:10px; border-radius:8px; margin-top:10px; }
+.log-box, .item-box { max-height:400px; overflow-y:auto; background:#fff; padding:10px; border-radius:8px; margin-top:10px; }
 .log-entry { border-bottom:1px solid #ccc; padding:6px 0; }
 .log-entry:last-child { border-bottom:none; }
-.back-btn, .action-btn, .tiny-btn { padding:6px 12px; margin:3px; border:none; border-radius:6px; cursor:pointer; }
+.back-btn, .action-btn { padding:6px 12px; margin:3px; border:none; border-radius:6px; cursor:pointer; }
 .back-btn { background:#999; color:#fff; }
 .action-btn { background:#007bff; color:#fff; }
-.tiny-btn { font-size:12px; padding:3px 6px; background:#555; color:#fff; }
-.reading-box { margin:10px 0; padding:10px; background:#fff; border-radius:8px; }
-.reading-box div { margin:5px 0; font-weight:bold; }
+.reading-box { margin:10px 0; padding:10px; background:#fff; border-radius:8px; display:flex; justify-content:space-between; align-items:center; }
+.reading-box div { margin:0 5px; font-weight:bold; }
+.reset-btn { padding:2px 6px; font-size:12px; border:none; border-radius:4px; cursor:pointer; background:#e67e22; color:#fff; }
 </style>
 </head>
 <body>
@@ -76,12 +77,8 @@ body { margin:0; font-family:Arial, sans-serif; display:flex; height:100vh; }
   <div id="supContent" style="display:none;">
     <!-- Readings -->
     <div class="reading-box">
-      <div>X Reading: ₱<span id="xReading">0.0</span> 
-        <button class="tiny-btn" onclick="resetX()">Reset X</button>
-      </div>
-      <div>Z Reading: ₱<span id="zReading">0.0</span> 
-        <button class="tiny-btn" onclick="resetZ()">Reset Z</button>
-      </div>
+      <div>X: ₱<span id="xReading">0.0</span> <button class="reset-btn" onclick="resetX()">Reset</button></div>
+      <div>Z: ₱<span id="zReading">0.0</span> <button class="reset-btn" onclick="resetZ()">Reset</button></div>
     </div>
 
     <h3>Change Supervisor Password</h3>
@@ -91,43 +88,20 @@ body { margin:0; font-family:Arial, sans-serif; display:flex; height:100vh; }
     <h3>Manage Items</h3>
     <input type="text" id="itemName" placeholder="Item Name">
     <input type="number" id="itemPrice" placeholder="Price">
-    <select id="itemColor">
-      <option value="#ffb3ba">Pastel Red</option>
-      <option value="#ffdfba">Pastel Orange</option>
-      <option value="#ffffba">Pastel Yellow</option>
-      <option value="#baffc9">Pastel Green</option>
-      <option value="#bae1ff">Pastel Blue</option>
-      <option value="#e0b3ff">Pastel Purple</option>
-    </select>
+    <input type="color" id="itemColor" value="#ffd1dc">
     <select id="itemTextColor">
-      <option value="#000000">Black Text</option>
-      <option value="#ffffff">White Text</option>
+      <option value="#000000">Black</option>
+      <option value="#ffffff">White</option>
     </select>
     <button class="action-btn" onclick="addItemSupervisor()">Add Item</button>
     <div class="item-box" id="itemBox"></div>
 
     <h3>Transaction Logs</h3>
     <div class="log-box" id="logBox"></div>
-
-    <h3>Z History</h3>
-    <div class="zhistory-box" id="zhistoryBox"></div>
   </div>
 </div>
 
 <script>
-// Simple beep
-function beep(freq=440, dur=100){
-  try {
-    let ctx=new (window.AudioContext||window.webkitAudioContext)();
-    let osc=ctx.createOscillator(); let gain=ctx.createGain();
-    osc.type="sine"; osc.frequency.value=freq;
-    osc.connect(gain); gain.connect(ctx.destination);
-    osc.start();
-    gain.gain.setValueAtTime(0.1,ctx.currentTime);
-    osc.stop(ctx.currentTime+dur/1000);
-  } catch(e) {}
-}
-
 // POS Variables
 let cart = [];
 let tendered = 0;
@@ -135,16 +109,14 @@ let tendered = 0;
 // Supervisor Data
 if(!localStorage.getItem("SUPPASS")) localStorage.setItem("SUPPASS","pi123");
 if(!localStorage.getItem("ITEMS")) {
-  localStorage.setItem("ITEMS",JSON.stringify([
-    {name:"Burger", price:50, color:"#ffb3ba", text:"#000000"},
-    {name:"Fries", price:30, color:"#ffdfba", text:"#000000"},
-    {name:"Coke", price:20, color:"#bae1ff", text:"#000000"}
+  localStorage.setItem("ITEMS", JSON.stringify([
+    {name:"Burger", price:50, color:"#ffd1dc", text:"#000000"},
+    {name:"Fries", price:30, color:"#d1ffd6", text:"#000000"},
+    {name:"Coke", price:20, color:"#d1d1ff", text:"#000000"},
+    {name:"Hotdog", price:40, color:"#fff5d1", text:"#000000"},
+    {name:"Iced Tea", price:25, color:"#ffd1ff", text:"#000000"}
   ]));
 }
-if(!localStorage.getItem("logs")) localStorage.setItem("logs","[]");
-if(!localStorage.getItem("xReading")) localStorage.setItem("xReading","0");
-if(!localStorage.getItem("zReading")) localStorage.setItem("zReading","0");
-if(!localStorage.getItem("zhistory")) localStorage.setItem("zhistory","[]");
 
 // Render items
 function renderItems(){
@@ -155,7 +127,7 @@ function renderItems(){
     let btn = document.createElement("button");
     btn.className="item-btn";
     btn.style.background=i.color;
-    btn.style.color=i.text||"#000";
+    btn.style.color=i.text || "#000";
     btn.innerText=`${i.name} - ₱${i.price}`;
     btn.onclick=()=>addItemToCart(i.name,i.price);
     itemsDiv.appendChild(btn);
@@ -167,15 +139,15 @@ function addItemToCart(name, price){
   let found = cart.find(i=>i.name===name);
   if(found) found.qty++;
   else cart.push({name, price, qty:1});
-  beep(600,80);
   renderCart();
 }
+
 function cancelItem(index){
   if(cart[index].qty>1) cart[index].qty--;
   else cart.splice(index,1);
-  beep(300,80);
   renderCart();
 }
+
 function renderCart(){
   const cartDiv = document.getElementById("cart");
   cartDiv.innerHTML="";
@@ -191,26 +163,20 @@ function renderCart(){
   document.getElementById("total").textContent="Total: ₱"+subtotal;
   document.getElementById("change").textContent="Change: ₱"+Math.max(0,tendered-subtotal);
 }
+
 function cashTender(amount){ tendered=amount; document.getElementById("customCash").value=amount; renderCart(); }
 function customCashTender(){ let val=parseFloat(document.getElementById("customCash").value); tendered=isNaN(val)?0:val; renderCart(); }
+
 function payAndReset(){
   if(cart.length===0){ alert("Cart is empty!"); return; }
   let subtotal=cart.reduce((a,b)=>a+b.price*b.qty,0);
   if(tendered<subtotal){ alert("Insufficient cash!"); return; }
 
-  let logs = JSON.parse(localStorage.getItem("logs"));
+  let logs = JSON.parse(localStorage.getItem("logs")||"[]");
   let date = new Date().toLocaleString();
   logs.push({date, cart:[...cart], total:subtotal});
   localStorage.setItem("logs",JSON.stringify(logs));
 
-  // Update readings
-  let x=parseFloat(localStorage.getItem("xReading"));
-  let z=parseFloat(localStorage.getItem("zReading"));
-  x+=subtotal; z+=subtotal;
-  localStorage.setItem("xReading",x);
-  localStorage.setItem("zReading",z);
-
-  beep(800,150);
   alert("Payment successful! Change: ₱"+(tendered-subtotal));
   cart=[]; tendered=0; document.getElementById("customCash").value="";
   renderCart();
@@ -219,13 +185,13 @@ function payAndReset(){
 // SUPERVISOR SCREEN
 function showSupervisor(){ document.getElementById("supervisor-screen").style.display="flex"; }
 function hideSupervisor(){ document.getElementById("supervisor-screen").style.display="none"; document.getElementById("supContent").style.display="none"; document.getElementById("supPass").value=""; }
+
 function loginSupervisor(){
   let pass = document.getElementById("supPass").value;
   if(pass===localStorage.getItem("SUPPASS")){
     document.getElementById("supContent").style.display="block";
     loadItemsSupervisor();
     loadLogs();
-    loadZHistory();
     updateReadings();
   } else alert("Wrong password");
 }
@@ -239,14 +205,17 @@ function changeSupPass(){
   document.getElementById("newPass").value="";
 }
 
-// ITEM MANAGEMENT
+// Item management
 function loadItemsSupervisor(){
   const itemBox = document.getElementById("itemBox");
   itemBox.innerHTML="";
   let items = JSON.parse(localStorage.getItem("ITEMS"));
   items.forEach((i,index)=>{
     let div = document.createElement("div");
-    div.style.display="flex"; div.style.justifyContent="space-between"; div.style.margin="4px 0"; div.style.alignItems="center";
+    div.style.display="flex";
+    div.style.justifyContent="space-between";
+    div.style.margin="4px 0";
+    div.style.alignItems="center";
     div.innerHTML = `${i.name} - ₱${i.price} 
       <div>
         <button class="action-btn" onclick="editItem(${index})">Edit</button>
@@ -255,19 +224,22 @@ function loadItemsSupervisor(){
     itemBox.appendChild(div);
   });
 }
+
 function addItemSupervisor(){
   let name = document.getElementById("itemName").value;
   let price = parseFloat(document.getElementById("itemPrice").value);
   let color = document.getElementById("itemColor").value;
-  let text = document.getElementById("itemTextColor").value;
+  let textColor = document.getElementById("itemTextColor").value;
   if(!name || isNaN(price)){ alert("Enter valid name and price"); return; }
   let items = JSON.parse(localStorage.getItem("ITEMS"));
-  items.push({name, price, color, text});
+  items.push({name, price, color, text:textColor});
   localStorage.setItem("ITEMS",JSON.stringify(items));
   document.getElementById("itemName").value="";
   document.getElementById("itemPrice").value="";
-  renderItems(); loadItemsSupervisor();
+  renderItems();
+  loadItemsSupervisor();
 }
+
 function editItem(index){
   let items = JSON.parse(localStorage.getItem("ITEMS"));
   let i = items[index];
@@ -275,22 +247,29 @@ function editItem(index){
   if(newName===null) return;
   let newPrice = parseFloat(prompt("Edit price:", i.price));
   if(isNaN(newPrice)) return;
-  items[index]={name:newName, price:newPrice, color:i.color, text:i.text};
+  let newColor = prompt("Edit color (hex):", i.color);
+  if(!newColor) return;
+  let newText = prompt("Edit text color (hex):", i.text || "#000000");
+  if(!newText) return;
+  items[index]={name:newName, price:newPrice, color:newColor, text:newText};
   localStorage.setItem("ITEMS",JSON.stringify(items));
-  renderItems(); loadItemsSupervisor();
+  renderItems();
+  loadItemsSupervisor();
 }
+
 function removeItem(index){
   let items = JSON.parse(localStorage.getItem("ITEMS"));
   if(confirm(`Remove ${items[index].name}?`)){
     items.splice(index,1);
     localStorage.setItem("ITEMS",JSON.stringify(items));
-    renderItems(); loadItemsSupervisor();
+    renderItems();
+    loadItemsSupervisor();
   }
 }
 
-// TRANSACTION LOGS
+// Logs
 function loadLogs(){
-  let logs = JSON.parse(localStorage.getItem("logs"));
+  let logs = JSON.parse(localStorage.getItem("logs")||"[]");
   let logBox = document.getElementById("logBox");
   logBox.innerHTML="";
   logs.forEach(l=>{
@@ -302,43 +281,20 @@ function loadLogs(){
   });
 }
 
-// READINGS
+// Readings
 function updateReadings(){
-  document.getElementById("xReading").textContent=parseFloat(localStorage.getItem("xReading")).toFixed(2);
-  document.getElementById("zReading").textContent=parseFloat(localStorage.getItem("zReading")).toFixed(2);
-}
-function resetX(){
-  localStorage.setItem("xReading","0");
-  updateReadings();
-}
-function resetZ(){
-  let z=parseFloat(localStorage.getItem("zReading"));
-  let zhistory=JSON.parse(localStorage.getItem("zhistory"));
-  let date=new Date().toLocaleString();
-  zhistory.push({date,total:z});
-  localStorage.setItem("zhistory",JSON.stringify(zhistory));
-  localStorage.setItem("zReading","0");
-  localStorage.setItem("xReading","0");
-  updateReadings();
-  loadZHistory();
-  alert("Z Reset complete and logged.");
+  let logs = JSON.parse(localStorage.getItem("logs")||"[]");
+  let totalSales = logs.reduce((sum,l)=>sum+l.total,0);
+  document.getElementById("xReading").textContent = totalSales.toFixed(2);
+  document.getElementById("zReading").textContent = totalSales.toFixed(2);
 }
 
-// Z HISTORY
-function loadZHistory(){
-  let zhistory=JSON.parse(localStorage.getItem("zhistory"));
-  let box=document.getElementById("zhistoryBox");
-  box.innerHTML="";
-  zhistory.forEach(z=>{
-    let div=document.createElement("div");
-    div.className="log-entry";
-    div.innerHTML=`<b>${z.date}</b> — Total: ₱${z.total.toFixed(2)}`;
-    box.appendChild(div);
-  });
-}
+function resetX(){ document.getElementById("xReading").textContent="0.0"; }
+function resetZ(){ document.getElementById("zReading").textContent="0.0"; }
 
-// INITIAL RENDER
-renderItems(); renderCart();
+// Initial render
+renderItems();
+renderCart();
 </script>
 
 </body>
