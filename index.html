@@ -2,72 +2,62 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>POS System (Kiosk)</title>
+<title>POS System - Full Version</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-  body { font-family: Arial, sans-serif; background:#f4f4f4; margin:0; padding:0; }
-  header { background:#222; color:#fff; padding:10px; text-align:center; }
-  .screen { display:none; padding:15px; }
-  .active { display:block; }
-  .items { display:grid; grid-template-columns: repeat(2, 1fr); gap:10px; margin-bottom:15px; }
-  .item-btn { padding:20px; border:none; color:#fff; font-size:18px; border-radius:10px; cursor:pointer; }
-  /* Sample colors – you can adjust */
-  .burger { background:#FF9800; }   /* Orange */
-  .fries { background:#FFC107; }    /* Yellow */
-  .soda { background:#03A9F4; }     /* Blue */
-  .meal { background:#F44336; }     /* Red */
-  .rice { background:#4CAF50; }     /* Green */
-
-  .cart { background:#fff; padding:10px; border-radius:10px; min-height:100px; }
-  .cart-line { display:flex; align-items:center; margin:5px 0; }
-  .cancel-btn { margin-right:8px; padding:2px 6px; font-size:12px; background:#9E9E9E; color:#fff; border:none; border-radius:5px; cursor:pointer; }
-  .btn { margin:5px; padding:12px 18px; font-size:16px; border:none; border-radius:8px; cursor:pointer; }
-  .subtotal { background:#FFC107; }
-  .total { background:#4CAF50; color:#fff; }
-  .supervisor { background:#607D8B; color:#fff; }
-  .back { background:#9E9E9E; color:#fff; }
-  .confirm { background:#2196F3; color:#fff; }
-  .cash-btns button { margin:5px; padding:15px; border:none; border-radius:8px; font-size:18px; }
-  .log-box { background:#fff; padding:10px; border-radius:10px; max-height:300px; overflow-y:auto; }
+body { margin:0; font-family:Arial, sans-serif; display:flex; height:100vh; }
+.cart, .items { padding:10px; box-sizing:border-box; }
+.cart { width:50%; background:#f9f9f9; overflow-y:auto; }
+.items { width:50%; background:#fff; overflow-y:auto; display:flex; flex-direction:column; }
+.item-btn { padding:20px; margin:5px 0; font-size:20px; border:none; border-radius:8px; color:#fff; cursor:pointer; }
+.cart-item { display:flex; align-items:center; justify-content:space-between; padding:8px; margin:4px 0; background:#eee; border-radius:6px; }
+.cancel-btn { background:#999; color:#fff; border:none; border-radius:4px; padding:2px 6px; margin-right:8px; cursor:pointer; font-size:14px; }
+.footer { position:absolute; bottom:0; left:0; width:100%; background:#222; color:#fff; padding:10px; display:flex; flex-wrap:wrap; align-items:center; }
+.footer div { margin:5px 10px; font-size:18px; }
+.cash-btn { padding:10px 20px; margin:3px; border:none; border-radius:6px; background:#007bff; color:#fff; font-size:16px; cursor:pointer; }
+.pay-btn { padding:10px 20px; margin:3px; border:none; border-radius:6px; background:#28a745; color:#fff; font-size:18px; cursor:pointer; flex:1; }
+.cash-input { padding:10px; margin:3px; border-radius:6px; border:1px solid #ccc; font-size:16px; width:120px; }
+.supervisor-screen { display:none; padding:15px; flex-direction:column; width:100%; background:#f0f0f0; overflow-y:auto; }
+.supervisor-screen h2 { margin-top:0; }
+.log-box { max-height:400px; overflow-y:auto; background:#fff; padding:10px; border-radius:8px; margin-top:10px; }
+.back-btn { padding:10px 20px; margin:3px; border:none; border-radius:6px; background:#999; color:#fff; cursor:pointer; }
 </style>
 </head>
 <body>
-<header><h1>POS System</h1></header>
 
 <!-- CASHIER SCREEN -->
-<div id="cashier" class="screen active">
-  <div class="items" id="itemButtons"></div>
-
+<div id="cashier-screen" style="display:flex; width:100%; height:100%;">
   <div class="cart" id="cart"></div>
-  <h3 id="totalDisplay">TOTAL: ₱0</h3>
-
-  <button class="btn subtotal" onclick="showSubtotal()">Subtotal</button>
-  <button class="btn total" onclick="goToScreen('tender')">Total / Pay</button>
-  <button class="btn supervisor" onclick="goToScreen('supervisor')">Supervisor</button>
+  <div class="items" id="items">
+    <button class="item-btn" style="background:#e74c3c" onclick="addItem('Burger',50)">🍔 Burger</button>
+    <button class="item-btn" style="background:#f39c12" onclick="addItem('Fries',30)">🍟 Fries</button>
+    <button class="item-btn" style="background:#3498db" onclick="addItem('Coke',20)">🥤 Coke</button>
+    <button class="item-btn" style="background:#27ae60" onclick="addItem('Hotdog',40)">🌭 Hotdog</button>
+    <button class="item-btn" style="background:#9b59b6" onclick="addItem('Iced Tea',25)">🧊 Iced Tea</button>
+  </div>
 </div>
 
-<!-- TENDER SCREEN -->
-<div id="tender" class="screen">
-  <h2 id="dueDisplay">TOTAL DUE: ₱0</h2>
-  <div class="cash-btns">
-    <button onclick="setTender(50)">₱50</button>
-    <button onclick="setTender(100)">₱100</button>
-    <button onclick="setTender(200)">₱200</button>
-    <button onclick="setTender(1000)">₱1000</button>
-  </div>
-  <p>Enter amount: <input type="number" id="customTender" oninput="updateChange()" /></p>
-  <h3 id="changeDisplay">Change: ₱0</h3>
-  <button class="btn confirm" onclick="confirmPayment()">Confirm Payment</button>
-  <button class="btn back" onclick="goToScreen('cashier')">Back</button>
+<div class="footer">
+  <div id="subtotal">Subtotal: ₱0</div>
+  <div id="total">Total: ₱0</div>
+  <div id="change">Change: ₱0</div>
+  <button class="cash-btn" onclick="cashTender(50)">₱50</button>
+  <button class="cash-btn" onclick="cashTender(100)">₱100</button>
+  <button class="cash-btn" onclick="cashTender(200)">₱200</button>
+  <button class="cash-btn" onclick="cashTender(500)">₱500</button>
+  <button class="cash-btn" onclick="cashTender(1000)">₱1000</button>
+  <input class="cash-input" type="number" id="customCash" placeholder="Enter ₱" oninput="customCashTender()">
+  <button class="pay-btn" onclick="payAndReset()">PAY & RESET</button>
+  <button class="cash-btn" onclick="showSupervisor()">Supervisor</button>
 </div>
 
 <!-- SUPERVISOR SCREEN -->
-<div id="supervisor" class="screen">
+<div class="supervisor-screen" id="supervisor-screen">
   <h2>Supervisor Login</h2>
-  <p>Password: <input type="password" id="supPass" /></p>
-  <button class="btn confirm" onclick="checkSupervisor()">Login</button>
-  <button class="btn back" onclick="goToScreen('cashier')">Back</button>
-  <div id="logs" style="display:none;">
+  <p>Password: <input type="password" id="supPass"></p>
+  <button onclick="loginSupervisor()">Login</button>
+  <button class="back-btn" onclick="hideSupervisor()">Back</button>
+  <div id="logSection" style="display:none;">
     <h3>Transaction Logs</h3>
     <div class="log-box" id="logBox"></div>
   </div>
@@ -75,123 +65,83 @@
 
 <script>
 let cart = [];
-let total = 0;
-let tender = 0;
-const PASSWORD = "pi123"; // mock Pi password
+let tendered = 0;
+const SUPPASS = "pi123";
 
-// Items (Supervisor-predefined, cashier cannot change)
-const items = [
-  { name: "Burger", price: 75, class: "burger" },
-  { name: "Fries", price: 45, class: "fries" },
-  { name: "Soda", price: 30, class: "soda" },
-  { name: "Chicken Meal", price: 120, class: "meal" },
-  { name: "Rice", price: 20, class: "rice" }
-];
+// CART FUNCTIONS
+function addItem(name, price){
+  let found = cart.find(i => i.name===name);
+  if(found){ found.qty++; } 
+  else { cart.push({name, price, qty:1}); }
+  renderCart();
+}
 
-// Render item buttons
-function renderItems() {
-  const container = document.getElementById("itemButtons");
-  container.innerHTML = "";
-  items.forEach(i => {
-    let btn = document.createElement("button");
-    btn.className = `item-btn ${i.class}`;
-    btn.innerText = i.name;
-    btn.onclick = () => addItem(i.name, i.price);
-    container.appendChild(btn);
+function cancelItem(index){
+  if(cart[index].qty>1){ cart[index].qty--; }
+  else { cart.splice(index,1); }
+  renderCart();
+}
+
+function renderCart(){
+  let cartDiv = document.getElementById("cart");
+  cartDiv.innerHTML = "";
+  let subtotal=0;
+  cart.forEach((item,i)=>{
+    subtotal += item.price*item.qty;
+    let div = document.createElement("div");
+    div.className="cart-item";
+    div.innerHTML = `<button class="cancel-btn" onclick="cancelItem(${i})">❌</button>${item.name} x${item.qty} = ₱${item.price*item.qty}`;
+    cartDiv.appendChild(div);
   });
+  document.getElementById("subtotal").textContent = "Subtotal: ₱"+subtotal;
+  document.getElementById("total").textContent = "Total: ₱"+subtotal;
+  document.getElementById("change").textContent = "Change: ₱"+Math.max(0,tendered-subtotal);
 }
 
-function addItem(name, price) {
-  let found = cart.find(i => i.name === name);
-  if(found) { found.qty++; found.total = found.qty * found.price; }
-  else { cart.push({name, price, qty:1, total:price}); }
-  updateCart();
-}
+function cashTender(amount){ tendered=amount; document.getElementById("customCash").value=amount; renderCart(); }
+function customCashTender(){ let val=parseFloat(document.getElementById("customCash").value); tendered=isNaN(val)?0:val; renderCart(); }
 
-function removeItem(name) {
-  cart = cart.filter(i => i.name !== name);
-  updateCart();
-}
+function payAndReset(){
+  if(cart.length===0){ alert("Cart is empty!"); return; }
+  let subtotal = cart.reduce((a,b)=>a+b.price*b.qty,0);
+  if(tendered<subtotal){ alert("Insufficient cash!"); return; }
 
-function updateCart() {
-  let cartDiv = document.getElementById('cart');
-  cartDiv.innerHTML = '';
-  total = 0;
-  cart.forEach(i => {
-    let line = document.createElement("div");
-    line.className = "cart-line";
-    line.innerHTML = `<button class="cancel-btn" onclick="removeItem('${i.name}')">❌</button> ${i.name} x${i.qty} = ₱${i.total}`;
-    cartDiv.appendChild(line);
-    total += i.total;
-  });
-  document.getElementById('totalDisplay').innerText = "TOTAL: ₱" + total;
-}
-
-function showSubtotal() {
-  alert("Subtotal: ₱" + total);
-}
-
-function goToScreen(screen) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(screen).classList.add('active');
-  if(screen === 'tender') {
-    document.getElementById('dueDisplay').innerText = "TOTAL DUE: ₱" + total;
-  }
-}
-
-function setTender(amount) {
-  document.getElementById('customTender').value = amount;
-  updateChange();
-}
-
-function updateChange() {
-  tender = parseFloat(document.getElementById('customTender').value) || 0;
-  let change = tender - total;
-  document.getElementById('changeDisplay').innerText = "Change: ₱" + (change >= 0 ? change : 0);
-}
-
-function confirmPayment() {
-  if(tender < total) { alert("Insufficient amount!"); return; }
-  saveLog();
-  alert("Payment successful! Change: ₱" + (tender - total));
-  cart = []; total = 0; tender = 0;
-  updateCart();
-  document.getElementById('customTender').value = '';
-  document.getElementById('changeDisplay').innerText = "Change: ₱0";
-  goToScreen('cashier');
-}
-
-function saveLog() {
-  let logs = JSON.parse(localStorage.getItem('logs') || '[]');
+  // save transaction
+  let logs = JSON.parse(localStorage.getItem("logs")||"[]");
   let date = new Date().toLocaleString();
-  let entry = {date, cart:[...cart], total};
-  logs.push(entry);
-  localStorage.setItem('logs', JSON.stringify(logs));
+  logs.push({date, cart:[...cart], total:subtotal});
+  localStorage.setItem("logs", JSON.stringify(logs));
+
+  alert("Payment successful! Change: ₱"+(tendered-subtotal));
+  cart=[]; tendered=0; document.getElementById("customCash").value="";
+  renderCart();
 }
 
-function checkSupervisor() {
-  let pass = document.getElementById('supPass').value;
-  if(pass === PASSWORD) {
-    document.getElementById('logs').style.display = 'block';
+// SUPERVISOR FUNCTIONS
+function showSupervisor(){ document.getElementById("supervisor-screen").style.display="flex"; }
+function hideSupervisor(){ document.getElementById("supervisor-screen").style.display="none"; document.getElementById("logSection").style.display="none"; document.getElementById("supPass").value=""; }
+
+function loginSupervisor(){
+  let pass = document.getElementById("supPass").value;
+  if(pass===SUPPASS){
+    document.getElementById("logSection").style.display="block";
     loadLogs();
-  } else {
-    alert("Wrong password");
-  }
+  } else { alert("Wrong password"); }
 }
 
-function loadLogs() {
-  let logs = JSON.parse(localStorage.getItem('logs') || '[]');
-  let logBox = document.getElementById('logBox');
-  logBox.innerHTML = '';
-  logs.forEach(l => {
-    let items = l.cart.map(i => `${i.name} x${i.qty} ₱${i.total}`).join(', ');
+function loadLogs(){
+  let logs = JSON.parse(localStorage.getItem("logs")||"[]");
+  let logBox = document.getElementById("logBox");
+  logBox.innerHTML="";
+  logs.forEach(l=>{
+    let items = l.cart.map(i=>`${i.name} x${i.qty} ₱${i.price*i.qty}`).join(", ");
     logBox.innerHTML += `<div>[${l.date}] ${items} → ₱${l.total}</div>`;
   });
 }
 
-// Initialize
-renderItems();
-updateCart();
+// INITIAL RENDER
+renderCart();
 </script>
+
 </body>
 </html>
