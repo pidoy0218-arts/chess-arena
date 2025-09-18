@@ -170,4 +170,77 @@ function changeSupPass(){
   if(newPass===""){ alert("Enter a valid password"); return; }
   localStorage.setItem("SUPPASS",newPass);
   alert("Password updated!");
-  document.getElementById("newPass").value="";
+  document.getElementById("newPass").value="";}
+
+// ITEM MANAGEMENT
+function loadItemsSupervisor(){
+  const itemBox = document.getElementById("itemBox");
+  itemBox.innerHTML="";
+  let items = JSON.parse(localStorage.getItem("ITEMS"));
+  items.forEach((i,index)=>{
+    let div = document.createElement("div");
+    div.style.display="flex"; div.style.justifyContent="space-between"; div.style.margin="4px 0"; div.style.alignItems="center";
+    div.innerHTML = `
+      ${i.name} - ₱${i.price} 
+      <div>
+        <button class="action-btn" onclick="editItem(${index})">Edit</button>
+        <button class="back-btn" onclick="removeItem(${index})">Remove</button>
+      </div>
+    `;
+    itemBox.appendChild(div);
+  });
+}
+
+function addItemSupervisor(){
+  let name = document.getElementById("itemName").value;
+  let price = parseFloat(document.getElementById("itemPrice").value);
+  let color = document.getElementById("itemColor").value;
+  if(!name || isNaN(price)){ alert("Enter valid name and price"); return; }
+  let items = JSON.parse(localStorage.getItem("ITEMS"));
+  items.push({name, price, color});
+  localStorage.setItem("ITEMS",JSON.stringify(items));
+  document.getElementById("itemName").value="";
+  document.getElementById("itemPrice").value="";
+  renderItems();
+  loadItemsSupervisor();
+}
+
+function editItem(index){
+  let items = JSON.parse(localStorage.getItem("ITEMS"));
+  let i = items[index];
+  let newName = prompt("Edit name:", i.name);
+  if(newName===null) return;
+  let newPrice = parseFloat(prompt("Edit price:", i.price));
+  if(isNaN(newPrice)) return;
+  let newColor = prompt("Edit color (hex):", i.color);
+  if(!newColor) return;
+  items[index]={name:newName, price:newPrice, color:newColor};
+  localStorage.setItem("ITEMS",JSON.stringify(items));
+  renderItems();
+  loadItemsSupervisor();
+}
+
+function removeItem(index){
+  let items = JSON.parse(localStorage.getItem("ITEMS"));
+  if(confirm(`Remove ${items[index].name}?`)){
+    items.splice(index,1);
+    localStorage.setItem("ITEMS",JSON.stringify(items));
+    renderItems();
+    loadItemsSupervisor();
+  }
+}
+
+// TRANSACTION LOGS
+function loadLogs(){
+  let logs = JSON.parse(localStorage.getItem("logs")||"[]");
+  let logBox = document.getElementById("logBox");
+  logBox.innerHTML="";
+  logs.forEach(l=>{
+    let items = l.cart.map(i=>`${i.name} x${i.qty} ₱${i.price*i.qty}`).join(", ");
+    logBox.innerHTML += `<div>[${l.date}] ${items} → ₱${l.total}</div>`;
+  });
+}
+
+// INITIAL RENDER
+renderItems();
+renderCart();
