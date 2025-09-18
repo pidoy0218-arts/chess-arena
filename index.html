@@ -16,13 +16,27 @@
   .btn { padding:10px; margin:5px; font-size:16px; border:none; border-radius:5px; cursor:pointer; }
   .cash-btn { background:#0077cc; color:#fff; }
   .pay-btn { background:#28a745; color:#fff; }
+
+  /* Supervisor full-screen overlay */
   #supervisorOverlay {
-    position:fixed; top:0; left:0; width:100%; height:100%;
-    background:rgba(0,0,0,0.8); color:#000; display:none; flex-direction:column;
-    justify-content:flex-start; align-items:center; padding:20px; overflow:auto;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.8);
+    display: none; /* hidden by default */
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 40px;
+    z-index: 1000;
   }
   #supervisorPanel {
-    background:#fff; padding:20px; border-radius:10px; width:90%; max-width:600px;
+    background: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90%;
+    overflow-y: auto;
   }
   input, select { padding:8px; margin:5px 0; width:100%; }
 </style>
@@ -84,7 +98,7 @@ let items = JSON.parse(localStorage.getItem("items")) || [
 let cart = [];
 let subtotal=0, total=0, cash=0;
 let logs = JSON.parse(localStorage.getItem("logs")) || [];
-const SUPERVISOR_PASSWORD = "pi123"; // changeable later
+const SUPERVISOR_PASSWORD = "pi123"; // default password
 
 function renderItems(){
   const div = document.getElementById("items");
