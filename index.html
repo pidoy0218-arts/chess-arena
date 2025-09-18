@@ -2,166 +2,196 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>POS with Z Reading</title>
+<title>POS System (Kiosk)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-  body { font-family: sans-serif; display: flex; height: 100vh; margin: 0; }
-  .products { flex: 2; display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; padding: 10px; }
-  .products button { font-size: 22px; padding: 25px; border-radius: 12px; }
-  .side { flex: 1; display: flex; flex-direction: column; background: #f7f7f7; padding: 10px; }
-  #cartDisplay { flex: 1; background: #fff; padding: 10px; overflow-y: auto; border: 1px solid #ccc; white-space: pre-line; }
-  .keypad { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; margin-top: 10px; }
-  .keypad button { font-size: 22px; padding: 20px; }
-  .totals button { width: 100%; padding: 15px; font-size: 20px; margin-top: 5px; border-radius: 8px; }
+  body { font-family: Arial, sans-serif; background:#f4f4f4; margin:0; padding:0; }
+  header { background:#222; color:#fff; padding:10px; text-align:center; }
+  .screen { display:none; padding:15px; }
+  .active { display:block; }
+  .items { display:grid; grid-template-columns: repeat(2, 1fr); gap:10px; margin-bottom:15px; }
+  .item-btn { padding:20px; border:none; color:#fff; font-size:18px; border-radius:10px; cursor:pointer; }
+  /* Sample colors – you can adjust */
+  .burger { background:#FF9800; }   /* Orange */
+  .fries { background:#FFC107; }    /* Yellow */
+  .soda { background:#03A9F4; }     /* Blue */
+  .meal { background:#F44336; }     /* Red */
+  .rice { background:#4CAF50; }     /* Green */
+
+  .cart { background:#fff; padding:10px; border-radius:10px; min-height:100px; }
+  .cart-line { display:flex; align-items:center; margin:5px 0; }
+  .cancel-btn { margin-right:8px; padding:2px 6px; font-size:12px; background:#9E9E9E; color:#fff; border:none; border-radius:5px; cursor:pointer; }
+  .btn { margin:5px; padding:12px 18px; font-size:16px; border:none; border-radius:8px; cursor:pointer; }
+  .subtotal { background:#FFC107; }
+  .total { background:#4CAF50; color:#fff; }
+  .supervisor { background:#607D8B; color:#fff; }
+  .back { background:#9E9E9E; color:#fff; }
+  .confirm { background:#2196F3; color:#fff; }
+  .cash-btns button { margin:5px; padding:15px; border:none; border-radius:8px; font-size:18px; }
+  .log-box { background:#fff; padding:10px; border-radius:10px; max-height:300px; overflow-y:auto; }
 </style>
 </head>
 <body>
+<header><h1>POS System</h1></header>
 
-<!-- Product Buttons -->
-<div class="products">
-  <button onclick="addItem('Milk')">Milk</button>
-  <button onclick="addItem('Coffee')">Coffee</button>
-  <button onclick="addItem('Sugar')">Sugar</button>
-  <button onclick="addItem('Tea')">Tea</button>
+<!-- CASHIER SCREEN -->
+<div id="cashier" class="screen active">
+  <div class="items" id="itemButtons"></div>
+
+  <div class="cart" id="cart"></div>
+  <h3 id="totalDisplay">TOTAL: ₱0</h3>
+
+  <button class="btn subtotal" onclick="showSubtotal()">Subtotal</button>
+  <button class="btn total" onclick="goToScreen('tender')">Total / Pay</button>
+  <button class="btn supervisor" onclick="goToScreen('supervisor')">Supervisor</button>
 </div>
 
-<!-- Side Display -->
-<div class="side">
-  <h2>Cart</h2>
-  <div id="cartDisplay"></div>
-
-  <!-- Calculator Keypad -->
-  <div class="keypad">
-    <button onclick="enterNumber(1)">1</button>
-    <button onclick="enterNumber(2)">2</button>
-    <button onclick="enterNumber(3)">3</button>
-    <button onclick="enterNumber(4)">4</button>
-    <button onclick="enterNumber(5)">5</button>
-    <button onclick="enterNumber(6)">6</button>
-    <button onclick="enterNumber(7)">7</button>
-    <button onclick="enterNumber(8)">8</button>
-    <button onclick="enterNumber(9)">9</button>
-    <button onclick="clearQty()">CLR</button>
-    <button onclick="enterNumber(0)">0</button>
-    <button onclick="setQty()">×</button>
+<!-- TENDER SCREEN -->
+<div id="tender" class="screen">
+  <h2 id="dueDisplay">TOTAL DUE: ₱0</h2>
+  <div class="cash-btns">
+    <button onclick="setTender(50)">₱50</button>
+    <button onclick="setTender(100)">₱100</button>
+    <button onclick="setTender(200)">₱200</button>
+    <button onclick="setTender(1000)">₱1000</button>
   </div>
+  <p>Enter amount: <input type="number" id="customTender" oninput="updateChange()" /></p>
+  <h3 id="changeDisplay">Change: ₱0</h3>
+  <button class="btn confirm" onclick="confirmPayment()">Confirm Payment</button>
+  <button class="btn back" onclick="goToScreen('cashier')">Back</button>
+</div>
 
-  <!-- Totals & Reports -->
-  <div class="totals">
-    <button onclick="showSubtotal()">Subtotal</button>
-    <button onclick="showTotal()">Total</button>
-    <button onclick="pay()">Pay & Print</button>
-    <hr>
-    <button onclick="initialReading()">Initial Reading</button>
-    <button onclick="xReading()">X Reading</button>
-    <button onclick="zReading()">Z Reading</button>
+<!-- SUPERVISOR SCREEN -->
+<div id="supervisor" class="screen">
+  <h2>Supervisor Login</h2>
+  <p>Password: <input type="password" id="supPass" /></p>
+  <button class="btn confirm" onclick="checkSupervisor()">Login</button>
+  <button class="btn back" onclick="goToScreen('cashier')">Back</button>
+  <div id="logs" style="display:none;">
+    <h3>Transaction Logs</h3>
+    <div class="log-box" id="logBox"></div>
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qz-tray/2.1.0/qz-tray.js"></script>
 <script>
-// Prices
-let prices = { Milk: 50, Coffee: 30, Sugar: 40, Tea: 25 };
 let cart = [];
-let qtyBuffer = "";
-let currentQty = 1;
-let salesHistory = []; // all completed sales
+let total = 0;
+let tender = 0;
+const PASSWORD = "pi123"; // mock Pi password
 
-// Keypad functions
-function enterNumber(num) { qtyBuffer += num; currentQty = parseInt(qtyBuffer) || 1; }
-function setQty() { if(qtyBuffer==="") currentQty=1; }
-function clearQty() { qtyBuffer=""; currentQty=1; }
+// Items (Supervisor-predefined, cashier cannot change)
+const items = [
+  { name: "Burger", price: 75, class: "burger" },
+  { name: "Fries", price: 45, class: "fries" },
+  { name: "Soda", price: 30, class: "soda" },
+  { name: "Chicken Meal", price: 120, class: "meal" },
+  { name: "Rice", price: 20, class: "rice" }
+];
 
-// Add item
-function addItem(name) {
-  let item = cart.find(i => i.name === name);
-  if(item) {
-    item.qty += currentQty;
-    item.subtotal = item.qty * prices[name];
-  } else {
-    cart.push({ name, qty: currentQty, subtotal: currentQty * prices[name] });
+// Render item buttons
+function renderItems() {
+  const container = document.getElementById("itemButtons");
+  container.innerHTML = "";
+  items.forEach(i => {
+    let btn = document.createElement("button");
+    btn.className = `item-btn ${i.class}`;
+    btn.innerText = i.name;
+    btn.onclick = () => addItem(i.name, i.price);
+    container.appendChild(btn);
+  });
+}
+
+function addItem(name, price) {
+  let found = cart.find(i => i.name === name);
+  if(found) { found.qty++; found.total = found.qty * found.price; }
+  else { cart.push({name, price, qty:1, total:price}); }
+  updateCart();
+}
+
+function removeItem(name) {
+  cart = cart.filter(i => i.name !== name);
+  updateCart();
+}
+
+function updateCart() {
+  let cartDiv = document.getElementById('cart');
+  cartDiv.innerHTML = '';
+  total = 0;
+  cart.forEach(i => {
+    let line = document.createElement("div");
+    line.className = "cart-line";
+    line.innerHTML = `<button class="cancel-btn" onclick="removeItem('${i.name}')">❌</button> ${i.name} x${i.qty} = ₱${i.total}`;
+    cartDiv.appendChild(line);
+    total += i.total;
+  });
+  document.getElementById('totalDisplay').innerText = "TOTAL: ₱" + total;
+}
+
+function showSubtotal() {
+  alert("Subtotal: ₱" + total);
+}
+
+function goToScreen(screen) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(screen).classList.add('active');
+  if(screen === 'tender') {
+    document.getElementById('dueDisplay').innerText = "TOTAL DUE: ₱" + total;
   }
-  clearQty();
-  renderCart();
 }
 
-// Display cart
-function renderCart() {
-  let disp = "";
-  cart.forEach(item => { disp += `${item.name} x${item.qty} = ₱${item.subtotal}\n`; });
-  document.getElementById("cartDisplay").textContent = disp;
+function setTender(amount) {
+  document.getElementById('customTender').value = amount;
+  updateChange();
 }
 
-// Subtotal / Total
-function showSubtotal() { alert("Subtotal: ₱" + cart.reduce((a,b)=>a+b.subtotal,0)); }
-function showTotal() { alert("TOTAL: ₱" + cart.reduce((a,b)=>a+b.subtotal,0)); }
-
-// Pay
-function pay() {
-  let total = cart.reduce((a,b)=>a+b.subtotal,0);
-  if(total === 0) return alert("Cart is empty!");
-
-  let sale = { time: new Date().toLocaleString(), cart: [...cart], total };
-  salesHistory.push(sale);
-
-  // Print receipt
-  let cmds = [
-    "\x1B\x40","   MY STORE\n","----------------------------\n"
-  ];
-  sale.cart.forEach(item => cmds.push(`${item.name} x${item.qty} = ₱${item.subtotal}\n`));
-  cmds.push("----------------------------\n");
-  cmds.push("TOTAL: ₱" + sale.total + "\n");
-  cmds.push("----------------------------\n");
-  cmds.push("THANK YOU!\n\n\n");
-  cmds.push("\x1D\x56\x41"); // Cut
-  cmds.push("\x1B\x70\x00\x19\xFA"); // Kick drawer
-
-  let config = qz.configs.create("Your_Printer_Name");
-  qz.print(config, cmds).catch(err=>console.error(err));
-
-  cart = [];
-  renderCart();
+function updateChange() {
+  tender = parseFloat(document.getElementById('customTender').value) || 0;
+  let change = tender - total;
+  document.getElementById('changeDisplay').innerText = "Change: ₱" + (change >= 0 ? change : 0);
 }
 
-// --- Reports ---
-function initialReading() {
-  let cmds = [
-    "\x1B\x40","   INITIAL READING\n",
-    "Date: " + new Date().toLocaleString() + "\n",
-    "Register Opened\n\n\n",
-    "\x1D\x56\x41"
-  ];
-  qz.print(qz.configs.create("Your_Printer_Name"), cmds);
+function confirmPayment() {
+  if(tender < total) { alert("Insufficient amount!"); return; }
+  saveLog();
+  alert("Payment successful! Change: ₱" + (tender - total));
+  cart = []; total = 0; tender = 0;
+  updateCart();
+  document.getElementById('customTender').value = '';
+  document.getElementById('changeDisplay').innerText = "Change: ₱0";
+  goToScreen('cashier');
 }
 
-function xReading() {
-  let totalSales = salesHistory.reduce((a,s)=>a+s.total,0);
-  let cmds = [
-    "\x1B\x40","   X READING\n",
-    "Date: " + new Date().toLocaleString() + "\n",
-    "Transactions: " + salesHistory.length + "\n",
-    "Total Sales: ₱" + totalSales + "\n\n\n",
-    "\x1D\x56\x41"
-  ];
-  qz.print(qz.configs.create("Your_Printer_Name"), cmds);
+function saveLog() {
+  let logs = JSON.parse(localStorage.getItem('logs') || '[]');
+  let date = new Date().toLocaleString();
+  let entry = {date, cart:[...cart], total};
+  logs.push(entry);
+  localStorage.setItem('logs', JSON.stringify(logs));
 }
 
-function zReading() {
-  let totalSales = salesHistory.reduce((a,s)=>a+s.total,0);
-  let cmds = [
-    "\x1B\x40","   Z READING\n",
-    "Date: " + new Date().toLocaleString() + "\n",
-    "Transactions: " + salesHistory.length + "\n",
-    "Total Sales: ₱" + totalSales + "\n",
-    "REGISTER CLOSED\n\n\n",
-    "\x1D\x56\x41"
-  ];
-  qz.print(qz.configs.create("Your_Printer_Name"), cmds);
-
-  // Reset for new day/shift
-  salesHistory = [];
+function checkSupervisor() {
+  let pass = document.getElementById('supPass').value;
+  if(pass === PASSWORD) {
+    document.getElementById('logs').style.display = 'block';
+    loadLogs();
+  } else {
+    alert("Wrong password");
+  }
 }
+
+function loadLogs() {
+  let logs = JSON.parse(localStorage.getItem('logs') || '[]');
+  let logBox = document.getElementById('logBox');
+  logBox.innerHTML = '';
+  logs.forEach(l => {
+    let items = l.cart.map(i => `${i.name} x${i.qty} ₱${i.total}`).join(', ');
+    logBox.innerHTML += `<div>[${l.date}] ${items} → ₱${l.total}</div>`;
+  });
+}
+
+// Initialize
+renderItems();
+updateCart();
 </script>
-
 </body>
 </html>
