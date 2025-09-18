@@ -1,467 +1,329 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<title>POS System - Supervisor & Cashier</title>
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta charset="UTF-8">
+<title>POS System - Full Supervisor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-  :root{ --bg:#fafafa; --panel:#fff; --muted:#ddd; --accent:#007bff; }
-  *{ box-sizing:border-box; }
-  body{ margin:0; font-family:Arial, sans-serif; background:var(--bg); color:#111; }
+body { margin:0; font-family:Arial, sans-serif; display:flex; height:100vh; }
+.cart, .items { padding:10px; box-sizing:border-box; }
+.cart { width:50%; background:#f9f9f9; overflow-y:auto; max-height:calc(100vh - 80px); }
+.items { width:50%; background:#fff; overflow-y:auto; display:flex; flex-direction:column; max-height:calc(100vh - 80px); }
+.item-btn { padding:20px; margin:5px 0; font-size:20px; border:none; border-radius:8px; color:#000; cursor:pointer; }
 
-  /* ----- Cashier area (kept same layout as requested) ----- */
-  .cashier { padding:12px; }
-  h2 { margin:0 0 10px 0; font-size:18px; }
+/* Pastel palette cycle */
+.item-btn:nth-child(5n+1) { background:#ffe4e1; } /* pastel pink */
+.item-btn:nth-child(5n+2) { background:#e0f7fa; } /* pastel blue */
+.item-btn:nth-child(5n+3) { background:#f1f8e9; } /* pastel green */
+.item-btn:nth-child(5n+4) { background:#fff3e0; } /* pastel orange */
+.item-btn:nth-child(5n+5) { background:#ede7f6; } /* pastel lavender */
 
-  .items {
-    border:1px solid #e6e6e6;
-    padding:8px;
-    max-height:420px; /* longer scroll stretch */
-    overflow-y:auto;
-    border-radius:6px;
-    background:var(--panel);
-  }
+.cart-item { display:flex; align-items:center; justify-content:space-between; padding:8px; margin:4px 0; background:#fafafa; border-radius:6px; }
+.cancel-btn { background:#ccc; color:#000; border:none; border-radius:4px; padding:2px 6px; margin-right:8px; cursor:pointer; font-size:14px; }
+.footer { position:absolute; bottom:0; left:0; width:100%; background:#222; color:#fff; padding:10px; display:flex; flex-wrap:wrap; align-items:center; }
+.footer div { margin:5px 10px; font-size:18px; }
+.cash-btn { padding:10px 20px; margin:3px; border:none; border-radius:6px; background:#007bff; color:#fff; font-size:16px; cursor:pointer; }
+.pay-btn { padding:10px 20px; margin:3px; border:none; border-radius:6px; background:#28a745; color:#fff; font-size:18px; cursor:pointer; flex:1; }
+.cash-input { padding:10px; margin:3px; border-radius:6px; border:1px solid #ccc; font-size:16px; width:120px; }
 
-  /* item buttons (pastel backgrounds, black text; black item keep white text) */
-  .item-button {
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    width:100%;
-    border:none;
-    padding:12px;
-    margin:6px 0;
-    border-radius:8px;
-    font-size:16px;
-    cursor:pointer;
-    box-shadow:0 1px 0 rgba(0,0,0,0.03) inset;
-  }
-  .item-label { flex:1; text-align:left; margin-right:8px; }
-  .item-price { white-space:nowrap; }
-
-  .totals { margin-top:10px; font-weight:700; }
-  .controls { margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; }
-
-  /* Cart display */
-  .cart {
-    margin-top:12px;
-    background:#fff;
-    border:1px solid #e6e6e6;
-    padding:8px;
-    border-radius:6px;
-    max-height:180px;
-    overflow-y:auto;
-  }
-  .cart-item {
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    padding:8px;
-    margin:6px 0;
-    background:#f8f8f8;
-    border-radius:6px;
-  }
-  .cart-item button {
-    font-size:14px;
-    padding:6px 8px;
-    border-radius:6px;
-    border:none;
-    cursor:pointer;
-    background:#f0f0f0;
-  }
-
-  /* footer actions (kept simple) */
-  .footer { margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-
-  /* Supervisor overlay (full overlay) */
-  .supervisor-screen {
-    display:none;
-    position:fixed;
-    inset:0;
-    background:rgba(240,240,240,0.95);
-    z-index:9999;
-    padding:18px;
-    overflow-y:auto;
-  }
-  .sup-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
-  .reading {
-    background:#fff;
-    padding:8px 10px;
-    border-radius:6px;
-    box-shadow:0 1px 0 rgba(0,0,0,0.03);
-    display:flex;
-    align-items:center;
-    gap:8px;
-    font-weight:600;
-    font-size:14px;
-  }
-  .reading small { font-weight:400; font-size:12px; color:#666; margin-left:4px; }
-
-  /* small safe toggles to avoid accidental press */
-  .small-btn {
-    padding:4px 8px;
-    font-size:12px;
-    border-radius:6px;
-    border:1px solid var(--muted);
-    background:#f3f3f3;
-    cursor:pointer;
-  }
-
-  .log-box {
-    margin-top:10px;
-    max-height:360px;
-    overflow-y:auto;
-    background:#fff;
-    padding:8px;
-    border-radius:6px;
-    border:1px solid #eee;
-  }
-  .log-entry {
-    border-bottom:1px solid #efefef;
-    padding:8px 6px;
-    font-size:13px;
-  }
-  .log-entry:last-child { border-bottom:none; }
-
-  /* tiny responsive niceties */
-  @media (min-width:800px){
-    .wrap { display:flex; gap:12px; }
-    .left { flex:1; }
-    .right { width:380px; }
-  }
+/* Supervisor overlay */
+.supervisor-screen {
+  display: none;
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(240,240,240,0.95);
+  z-index: 9999;
+  padding: 15px;
+  flex-direction: column;
+  overflow-y: auto;
+}
+.supervisor-screen h2 { margin-top:0; }
+.log-box, .item-box { max-height:250px; overflow-y:auto; background:#fff; padding:10px; border-radius:8px; margin-top:10px; }
+.log-entry { border-bottom:1px solid #ccc; padding:6px 0; }
+.log-entry:last-child { border-bottom:none; }
+.back-btn, .action-btn, .tiny-btn { padding:6px 12px; margin:3px; border:none; border-radius:6px; cursor:pointer; }
+.back-btn { background:#999; color:#fff; }
+.action-btn { background:#007bff; color:#fff; }
+.tiny-btn { background:#444; color:#fff; font-size:12px; padding:2px 6px; margin-left:6px; }
+.reading-box { margin:10px 0; padding:10px; background:#fff; border-radius:8px; }
+.reading-box div { margin:5px 0; font-weight:bold; }
 </style>
 </head>
 <body>
 
-<div class="wrap">
-  <div class="left cashier" style="padding:12px;">
-    <h2>Cashier Screen</h2>
+<!-- CASHIER SCREEN -->
+<div id="cashier-screen" style="display:flex; width:100%; height:100%;">
+  <div class="cart" id="cart"></div>
+  <div class="items" id="items"></div>
+</div>
 
-    <!-- Item buttons area -->
-    <div class="items" id="items"></div>
-
-    <!-- Cart -->
-    <div class="cart" id="cart">
-      <div style="font-size:13px;color:#666;">Cart is empty</div>
-    </div>
-
-    <div class="totals">
-      Subtotal: ₱<span id="subtotal">0.00</span><br>
-      Total: ₱<span id="total">0.00</span><br>
-      Tendered: ₱<span id="tendered">0.00</span>
-    </div>
-
-    <div class="controls">
-      <button onclick="payAndReset()" class="small-btn">PAY & RESET</button>
-      <button onclick="showSupervisor()" class="small-btn">Supervisor</button>
-    </div>
-  </div>
-
-  <div class="right" style="padding:12px;">
-    <!-- quick-add buttons kept for convenience (no layout change) -->
-    <h3 style="margin-top:0">Quick Add</h3>
-    <div style="display:flex;flex-direction:column;gap:8px">
-      <button onclick="addItemByName('Burger')" class="small-btn">Add Burger</button>
-      <button onclick="addItemByName('Fries')" class="small-btn">Add Fries</button>
-      <button onclick="addItemByName('Coke')" class="small-btn">Add Coke</button>
-      <button onclick="addItemByName('Black Coffee')" class="small-btn">Add Black Coffee</button>
-    </div>
-  </div>
+<div class="footer">
+  <div id="subtotal">Subtotal: ₱0</div>
+  <div id="total">Total: ₱0</div>
+  <div id="change">Change: ₱0</div>
+  <button class="cash-btn" onclick="cashTender(50)">₱50</button>
+  <button class="cash-btn" onclick="cashTender(100)">₱100</button>
+  <button class="cash-btn" onclick="cashTender(200)">₱200</button>
+  <button class="cash-btn" onclick="cashTender(500)">₱500</button>
+  <button class="cash-btn" onclick="cashTender(1000)">₱1000</button>
+  <input class="cash-input" type="number" id="customCash" placeholder="Enter ₱" oninput="customCashTender()">
+  <button class="pay-btn" onclick="payAndReset()">PAY & RESET</button>
+  <button class="cash-btn" onclick="showSupervisor()">Supervisor</button>
 </div>
 
 <!-- SUPERVISOR SCREEN -->
-<div class="supervisor-screen" id="supervisor-screen" aria-hidden="true">
-  <div style="display:flex;justify-content:space-between;align-items:center;">
-    <div style="font-weight:700;font-size:16px">Supervisor</div>
-    <button class="small-btn" onclick="hideSupervisor()">Close</button>
-  </div>
+<div class="supervisor-screen" id="supervisor-screen">
+  <h2>Supervisor Login</h2>
+  <p>Password: <input type="password" id="supPass"></p>
+  <button class="action-btn" onclick="loginSupervisor()">Login</button>
+  <button class="back-btn" onclick="hideSupervisor()">Back</button>
 
-  <div style="margin-top:12px;">
-    <div class="sup-row">
-      <div class="reading">
+  <div id="supContent" style="display:none;">
+    <!-- Initial Readings -->
+    <div class="reading-box">
+      <div>
         X Reading: ₱<span id="xReading">0.0</span>
-        <small>(daily)</small>
+        <button class="tiny-btn" onclick="doXReading()">X Reset</button>
       </div>
-      <button class="small-btn" title="Log X reading to Z and reset X" onclick="doXReading()">X Reset</button>
-    </div>
-
-    <div class="sup-row">
-      <div class="reading">
+      <div>
         Z Reading: ₱<span id="zReading">0.0</span>
-        <small>(weekly cumulative)</small>
+        <button class="tiny-btn" onclick="resetZReading()">Z Reset</button>
       </div>
-      <button class="small-btn" title="Clear weekly Z reading history" onclick="resetZReading()">Z Reset</button>
     </div>
 
-    <div style="margin-top:8px;font-weight:600">Transaction Logs</div>
-    <div class="log-box" id="logBox" aria-live="polite"></div>
+    <h3>Change Supervisor Password</h3>
+    <input type="password" id="newPass" placeholder="New password">
+    <button class="action-btn" onclick="changeSupPass()">Update Password</button>
 
-    <div style="margin-top:10px;">
-      <div style="font-size:13px;color:#555">Z History (X readings logged here):</div>
-      <div class="log-box" id="zHistoryBox" style="max-height:160px;"></div>
-    </div>
+    <h3>Manage Items</h3>
+    <input type="text" id="itemName" placeholder="Item Name">
+    <input type="number" id="itemPrice" placeholder="Price">
+    <input type="color" id="itemColor" value="#ff0000">
+    <button class="action-btn" onclick="addItemSupervisor()">Add Item</button>
+    <div class="item-box" id="itemBox"></div>
+
+    <h3>Transaction Logs</h3>
+    <div class="log-box" id="logBox"></div>
   </div>
 </div>
 
-<!-- Blip audio -->
-<audio id="blip" preload="auto">
-  <source src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" type="audio/ogg">
-  <source src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.mp3" type="audio/mpeg">
-</audio>
+<audio id="blip" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" preload="auto"></audio>
 
 <script>
-/* ---------- Data & persistence ---------- */
-const DEFAULT_ITEMS = [
-  { name: "Burger", price: 50, color: "#ffb3ba" },
-  { name: "Fries", price: 30, color: "#ffdfba" },
-  { name: "Coke", price: 20, color: "#baffc9" },
-  { name: "Hotdog", price: 40, color: "#bae1ff" },
-  { name: "Iced Tea", price: 25, color: "#d5b3ff" },
-  { name: "Black Coffee", price: 35, color: "#000000" } // black item
-];
+// POS Variables
+let cart = [];
+let tendered = 0;
+let xReading = 0;
+let zReading = 0;
 
-let ITEMS = JSON.parse(localStorage.getItem('ITEMS') || 'null') || DEFAULT_ITEMS;
-localStorage.setItem('ITEMS', JSON.stringify(ITEMS));
-
-let cart = []; // {name, price, qty}
-let xReading = parseFloat(localStorage.getItem('X_READING') || '0') || 0; // running daily total
-let zReading = parseFloat(localStorage.getItem('Z_READING') || '0') || 0; // weekly cumulative
-let salesLogs = JSON.parse(localStorage.getItem('SALES_LOGS') || '[]'); // array of transactions
-let zHistory = JSON.parse(localStorage.getItem('Z_HISTORY') || '[]'); // array of {date,amount}
-
-/* ---------- Utilities ---------- */
-function saveState(){
-  localStorage.setItem('X_READING', xReading.toString());
-  localStorage.setItem('Z_READING', zReading.toString());
-  localStorage.setItem('SALES_LOGS', JSON.stringify(salesLogs));
-  localStorage.setItem('Z_HISTORY', JSON.stringify(zHistory));
+// Supervisor Data
+if(!localStorage.getItem("SUPPASS")) localStorage.setItem("SUPPASS","pi123");
+if(!localStorage.getItem("ITEMS")) {
+  localStorage.setItem("ITEMS",JSON.stringify([
+    {name:"Burger", price:50, color:"#ffe4e1"},
+    {name:"Fries", price:30, color:"#e0f7fa"},
+    {name:"Coke", price:20, color:"#f1f8e9"},
+    {name:"Hotdog", price:40, color:"#fff3e0"},
+    {name:"Iced Tea", price:25, color:"#ede7f6"}
+  ]));
 }
 
 function playBlip(){
-  const s = document.getElementById('blip');
-  if(!s) return;
-  try{
-    s.currentTime = 0;
-    s.play();
-  }catch(e){
-    // ignore autoplay exceptions
-  }
+  let snd=document.getElementById("blip");
+  snd.currentTime=0; snd.play();
 }
 
-function isDarkHex(hex){
-  if(!hex) return false;
-  const c = hex.replace('#','');
-  const r = parseInt(c.substring(0,2),16);
-  const g = parseInt(c.substring(2,4),16);
-  const b = parseInt(c.substring(4,6),16);
-  // luminance
-  const lum = 0.2126*r + 0.7152*g + 0.0722*b;
-  return lum < 128;
-}
-
-/* ---------- Rendering ---------- */
+// Render items
 function renderItems(){
-  const itemsDiv = document.getElementById('items');
-  itemsDiv.innerHTML = '';
-  ITEMS.forEach(it=>{
-    const btn = document.createElement('button');
-    btn.className = 'item-button';
-    btn.style.background = it.color;
-    btn.style.color = (it.color.toLowerCase().trim() === '#000000' || isDarkHex(it.color)) ? '#fff' : '#000';
-    btn.innerHTML = `<span class="item-label">${it.name}</span><span class="item-price">₱${it.price.toFixed(2)}</span>`;
-    btn.onclick = ()=>{ addItem(it.name, it.price); };
+  const itemsDiv = document.getElementById("items");
+  itemsDiv.innerHTML="";
+  let items = JSON.parse(localStorage.getItem("ITEMS"));
+  items.forEach(i=>{
+    let btn = document.createElement("button");
+    btn.className="item-btn";
+    btn.style.background=i.color;
+    btn.innerText=`${i.name} - ₱${i.price}`;
+    btn.onclick=()=>addItemToCart(i.name,i.price);
     itemsDiv.appendChild(btn);
   });
 }
 
-function renderCart(){
-  const cartDiv = document.getElementById('cart');
-  cartDiv.innerHTML = '';
-  if(cart.length === 0){
-    cartDiv.innerHTML = '<div style="font-size:13px;color:#666">Cart is empty</div>';
-    updateTotals(0);
-    return;
-  }
-  let subtotal = 0;
-  cart.forEach((c, idx)=>{
-    subtotal += c.price * c.qty;
-    const row = document.createElement('div');
-    row.className = 'cart-item';
-    const left = document.createElement('div');
-    left.innerHTML = `${c.name} x${c.qty} <span style="color:#333">= ₱${(c.price*c.qty).toFixed(2)}</span>`;
-    const right = document.createElement('div');
-    // decrease button (step down) - small ❌ to match user expectation
-    const dec = document.createElement('button');
-    dec.innerText = '❌';
-    dec.title = 'Decrease / Remove';
-    dec.onclick = ()=>{ decreaseItem(idx); };
-    right.appendChild(dec);
-    row.appendChild(left);
-    row.appendChild(right);
-    cartDiv.appendChild(row);
-  });
-  updateTotals(subtotal);
-}
-
-function updateTotals(sub){
-  document.getElementById('subtotal').textContent = sub.toFixed(2);
-  document.getElementById('total').textContent = sub.toFixed(2);
-  // tendered is not used heavily here; keep it zeroed
-  document.getElementById('tendered').textContent = '0.00';
-}
-
-/* ---------- Cart operations ---------- */
-function addItem(name, price){
-  const existing = cart.find(c=>c.name===name);
-  if(existing) existing.qty += 1;
+// CART FUNCTIONS
+function addItemToCart(name, price){
+  let found = cart.find(i=>i.name===name);
+  if(found) found.qty++;
   else cart.push({name, price, qty:1});
-  xReading += price;
-  saveState();
+  xReading+=price;
   renderCart();
   playBlip();
 }
 
-function addItemByName(name){
-  const it = ITEMS.find(i=>i.name===name);
-  if(it) addItem(it.name, it.price);
-}
-
-function decreaseItem(index){
-  if(index < 0 || index >= cart.length) return;
-  const item = cart[index];
-  // decrease qty by 1; if qty becomes 0 remove
-  item.qty -= 1;
-  xReading -= item.price;
-  if(item.qty <= 0) cart.splice(index,1);
-  if(xReading < 0) xReading = 0;
-  saveState();
+function cancelItem(index){
+  let item = cart[index];
+  item.qty--; xReading-=item.price;
+  if(item.qty<=0) cart.splice(index,1);
   renderCart();
   playBlip();
 }
 
-/* ---------- Payment ---------- */
+function renderCart(){
+  const cartDiv = document.getElementById("cart");
+  cartDiv.innerHTML="";
+  let subtotal=0;
+  cart.forEach((item,i)=>{
+    subtotal+=item.price*item.qty;
+    let div=document.createElement("div");
+    div.className="cart-item";
+    div.innerHTML=`<button class="cancel-btn" onclick="cancelItem(${i})">❌</button>${item.name} x${item.qty} = ₱${item.price*item.qty}`;
+    cartDiv.appendChild(div);
+  });
+  document.getElementById("subtotal").textContent="Subtotal: ₱"+subtotal;
+  document.getElementById("total").textContent="Total: ₱"+subtotal;
+  document.getElementById("change").textContent="Change: ₱"+Math.max(0,tendered-subtotal);
+}
+
+function cashTender(amount){ tendered=amount; document.getElementById("customCash").value=amount; renderCart(); }
+function customCashTender(){ let val=parseFloat(document.getElementById("customCash").value); tendered=isNaN(val)?0:val; renderCart(); }
+
 function payAndReset(){
-  if(cart.length === 0){
-    alert('Cart is empty!');
-    return;
-  }
-  const total = cart.reduce((s,c)=>s+c.price*c.qty, 0);
-  const date = new Date().toLocaleString();
-  const tx = { date, cart: JSON.parse(JSON.stringify(cart)), total };
-  salesLogs.unshift(tx); // newest first
-  // Clear cart (but do not clear xReading - xReading is running daily total)
-  cart = [];
-  saveState();
+  if(cart.length===0){ alert("Cart is empty!"); return; }
+  let subtotal=cart.reduce((a,b)=>a+b.price*b.qty,0);
+  if(tendered<subtotal){ alert("Insufficient cash!"); return; }
+
+  let logs = JSON.parse(localStorage.getItem("logs")||"[]");
+  let date = new Date().toLocaleString();
+  logs.push({date, cart:[...cart], total:subtotal});
+  localStorage.setItem("logs",JSON.stringify(logs));
+
+  alert("Payment successful! Change: ₱"+(tendered-subtotal));
+  cart=[]; tendered=0; document.getElementById("customCash").value="";
   renderCart();
-  alert('Payment recorded. Total: ₱' + total.toFixed(2));
-  // update supervisor log area if open
-  if(document.getElementById('supervisor-screen').style.display === 'block'){
-    renderLogs();
-  }
-  playBlip();
 }
 
-/* ---------- Supervisor / X & Z ---------- */
-function showSupervisor(){
-  document.getElementById('supervisor-screen').style.display = 'block';
-  document.getElementById('supervisor-screen').setAttribute('aria-hidden','false');
-  renderSupervisorReadings();
-  renderLogs();
-  renderZHistory();
-}
-function hideSupervisor(){
-  document.getElementById('supervisor-screen').style.display = 'none';
-  document.getElementById('supervisor-screen').setAttribute('aria-hidden','true');
+// SUPERVISOR SCREEN
+function showSupervisor(){ document.getElementById("supervisor-screen").style.display="flex"; }
+function hideSupervisor(){ document.getElementById("supervisor-screen").style.display="none"; document.getElementById("supContent").style.display="none"; document.getElementById("supPass").value=""; }
+
+function loginSupervisor(){
+  let pass = document.getElementById("supPass").value;
+  if(pass===localStorage.getItem("SUPPASS")){
+    document.getElementById("supContent").style.display="block";
+    loadItemsSupervisor();
+    loadLogs();
+    updateReadings();
+  } else alert("Wrong password");
 }
 
-function renderSupervisorReadings(){
-  document.getElementById('xReading').textContent = xReading.toFixed(1);
-  document.getElementById('zReading').textContent = zReading.toFixed(1);
+// Change supervisor password
+function changeSupPass(){
+  let newPass = document.getElementById("newPass").value;
+  if(newPass===""){ alert("Enter a valid password"); return; }
+  localStorage.setItem("SUPPASS",newPass);
+  alert("Password updated!");
+  document.getElementById("newPass").value="";
 }
 
-function renderLogs(){
-  const box = document.getElementById('logBox');
-  box.innerHTML = '';
-  if(salesLogs.length === 0){
-    box.innerHTML = '<div style="color:#666;font-size:13px">No transactions yet</div>';
-    return;
-  }
-  salesLogs.forEach(tx=>{
-    const e = document.createElement('div');
-    e.className = 'log-entry';
-    const itemsText = tx.cart.map(ci => `${ci.name} x${ci.qty} = ₱${(ci.price*ci.qty).toFixed(2)}`).join('<br>');
-    e.innerHTML = `<div style="font-weight:600">${tx.date}</div><div style="margin-top:6px">${itemsText}</div><div style="margin-top:6px;font-weight:700">Total: ₱${tx.total.toFixed(2)}</div>`;
-    box.appendChild(e);
+// ITEM MANAGEMENT
+function loadItemsSupervisor(){
+  const itemBox = document.getElementById("itemBox");
+  itemBox.innerHTML="";
+  let items = JSON.parse(localStorage.getItem("ITEMS"));
+  items.forEach((i,index)=>{
+    let div = document.createElement("div");
+    div.style.display="flex"; div.style.justifyContent="space-between"; div.style.margin="4px 0"; div.style.alignItems="center";
+    div.innerHTML = `
+      ${i.name} - ₱${i.price} 
+      <div>
+        <button class="action-btn" onclick="editItem(${index})">Edit</button>
+        <button class="back-btn" onclick="removeItem(${index})">Remove</button>
+      </div>
+    `;
+    itemBox.appendChild(div);
   });
 }
 
-function renderZHistory(){
-  const box = document.getElementById('zHistoryBox');
-  box.innerHTML = '';
-  if(zHistory.length === 0){
-    box.innerHTML = '<div style="color:#666;font-size:13px">No X readings logged to Z yet</div>';
-    return;
-  }
-  zHistory.forEach(z => {
-    const e = document.createElement('div');
-    e.className = 'log-entry';
-    e.innerHTML = `<div style="font-weight:600">${z.date}</div><div style="margin-top:6px">Amount: ₱${z.amount.toFixed(2)}</div>`;
-    box.appendChild(e);
-  });
-}
-
-/* When clicking X Reset: log X amount into Z history, add to zReading and reset xReading */
-function doXReading(){
-  const amount = parseFloat(xReading) || 0;
-  const date = new Date().toLocaleString();
-  zHistory.unshift({ date, amount });
-  zReading = (parseFloat(zReading) || 0) + amount;
-  xReading = 0;
-  saveState();
-  renderSupervisorReadings();
-  renderZHistory();
-  // add a small entry in transaction logs area so supervisor sees it (optional)
-  const box = document.getElementById('logBox');
-  const e = document.createElement('div');
-  e.className = 'log-entry';
-  e.innerHTML = `<div style="font-weight:600">${date} — X Reading logged</div><div style="margin-top:6px">Amount: ₱${amount.toFixed(2)}</div>`;
-  box.prepend(e);
-  playBlip();
-}
-
-/* Reset whole Z (weekly) */
-function resetZReading(){
-  if(!confirm('Reset Z reading? This clears Z total and Z history.')) return;
-  zReading = 0;
-  zHistory = [];
-  saveState();
-  renderSupervisorReadings();
-  renderZHistory();
-  const box = document.getElementById('logBox');
-  const e = document.createElement('div');
-  e.className = 'log-entry';
-  e.innerHTML = `<div style="font-weight:600">${new Date().toLocaleString()} — Z Reading reset</div>`;
-  box.prepend(e);
-  playBlip();
-}
-
-/* ---------- Init ---------- */
-function init(){
+function addItemSupervisor(){
+  let name = document.getElementById("itemName").value;
+  let price = parseFloat(document.getElementById("itemPrice").value);
+  let color = document.getElementById("itemColor").value;
+  if(!name || isNaN(price)){ alert("Enter valid name and price"); return; }
+  let items = JSON.parse(localStorage.getItem("ITEMS"));
+  items.push({name, price, color});
+  localStorage.setItem("ITEMS",JSON.stringify(items));
+  document.getElementById("itemName").value="";
+  document.getElementById("itemPrice").value="";
   renderItems();
-  renderCart();
-  renderSupervisorReadings();
-  // show stored logs in supervisor if they open later
+  loadItemsSupervisor();
 }
-init();
 
-/* expose a small API to quickly add by name (used by quick-add right column) */
-window.addItemByName = addItemByName;
-window.showSupervisor = showSupervisor;
-window.hideSupervisor = hideSupervisor;
-window.payAndReset = payAndReset;
-window.doXReading = doXReading;
-window.resetZReading = resetZReading;
+function editItem(index){
+  let items = JSON.parse(localStorage.getItem("ITEMS"));
+  let i = items[index];
+  let newName = prompt("Edit name:", i.name);
+  if(newName===null) return;
+  let newPrice = parseFloat(prompt("Edit price:", i.price));
+  if(isNaN(newPrice)) return;
+  let newColor = prompt("Edit color (hex):", i.color);
+  if(!newColor) return;
+  items[index]={name:newName, price:newPrice, color:newColor};
+  localStorage.setItem("ITEMS",JSON.stringify(items));
+  renderItems();
+  loadItemsSupervisor();
+}
+
+function removeItem(index){
+  let items = JSON.parse(localStorage.getItem("ITEMS"));
+  if(confirm(`Remove ${items[index].name}?`)){
+    items.splice(index,1);
+    localStorage.setItem("ITEMS",JSON.stringify(items));
+    renderItems();
+    loadItemsSupervisor();
+  }
+}
+
+// TRANSACTION LOGS
+function loadLogs(){
+  let logs = JSON.parse(localStorage.getItem("logs")||"[]");
+  let logBox = document.getElementById("logBox");
+  logBox.innerHTML="";
+  logs.forEach(l=>{
+    let entry = document.createElement("div");
+    entry.className="log-entry";
+    let items = l.cart.map(i=>`${i.name} x${i.qty} = ₱${i.price*i.qty}`).join("<br>");
+    entry.innerHTML = `<div><b>${l.date}</b></div><div>${items}</div><div><b>Total: ₱${l.total}</b></div>`;
+    logBox.prepend(entry);
+  });
+}
+
+// READINGS
+function updateReadings(){
+  document.getElementById("xReading").textContent = xReading.toFixed(1);
+  document.getElementById("zReading").textContent = zReading.toFixed(1);
+}
+function doXReading(){
+  zReading += xReading;
+  let logBox=document.getElementById("logBox");
+  let entry=document.createElement("div");
+  entry.className="log-entry";
+  entry.textContent="X Reading closed: ₱"+xReading.toFixed(1);
+  logBox.prepend(entry);
+  xReading=0;
+  updateReadings();
+}
+function resetZReading(){
+  let logBox=document.getElementById("logBox");
+  let entry=document.createElement("div");
+  entry.className="log-entry";
+  entry.textContent="Z Reading reset: ₱"+zReading.toFixed(1);
+  logBox.prepend(entry);
+  zReading=0; xReading=0;
+  updateReadings();
+}
+
+// INITIAL RENDER
+renderItems();
+renderCart();
 </script>
-
 </body>
 </html>
