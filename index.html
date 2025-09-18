@@ -170,7 +170,8 @@ function changeSupPass(){
   if(newPass===""){ alert("Enter a valid password"); return; }
   localStorage.setItem("SUPPASS",newPass);
   alert("Password updated!");
-  document.getElementById("newPass").value="";}
+  document.getElementById("newPass").value="";
+}
 
 // ITEM MANAGEMENT
 function loadItemsSupervisor(){
@@ -244,3 +245,7 @@ function loadLogs(){
 // INITIAL RENDER
 renderItems();
 renderCart();
+</script>
+
+</body>
+</html>
