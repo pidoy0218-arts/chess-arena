@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>POS System - Full Supervisor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body { margin:0; font-family:Arial, sans-serif; display:flex; height:100vh; }
+.cart, .items { padding:10px; box-sizing:border-box; }
+.cart { width:50%; background:#f9f9f9; overflow-y:auto; }
+.items { width:50%; background:#fff; overflow-y:auto; display:flex; flex-direction:column; max-height:calc(100vh - 100px); }
+.item-btn { padding:20px; margin:5px 0; font-size:20px; border:none; border-radius:8px; color:#fff; cursor:pointer; }
+.cart-item { display:flex; align-items:center; justify-content:space-between; padding:8px; margin:4px 0; background:#eee; border-radius:6px; }
+.cancel-btn { background:#999; color:#fff; border:none; border-radius:4px; padding:2px 6px; margin-right:8px; cursor:pointer; font-size:14px; }
+.footer { position:absolute; bottom:0; left:0; width:100%; background:#222; color:#fff; padding:10px; display:flex; flex-wrap:wrap; align-items:center; }
+.footer div { margin:5px 10px; font-size:18px; }
+.cash-btn { padding:10px 20px; margin:3px; border:none; border-radius:6px; background:#007bff; color:#fff; font-size:16px; cursor:pointer; }
+.pay-btn { padding:10px 20px; margin:3px; border:none; border-radius:6px; background:#28a745; color:#fff; font-size:18px; cursor:pointer; flex:1; }
+.cash-input { padding:10px; margin:3px; border-radius:6px; border:1px solid #ccc; font-size:16px; width:120px; }
+
+/* Supervisor overlay */
+.supervisor-screen {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(240,240,240,0.95);
+  z-index: 9999;
+  padding: 15px; flex-direction: column; overflow-y: auto;
+}
+.supervisor-screen h2 { margin-top:0; }
+.log-box, .item-box { max-height:400px; overflow-y:auto; background:#fff; padding:10px; border-radius:8px; margin-top:10px; }
+.log-entry { border-bottom:1px solid #ccc; padding:6px 0; }
+.log-entry:last-child { border-bottom:none; }
+.back-btn, .action-btn { padding:6px 12px; margin:3px; border:none; border-radius:6px; cursor:pointer; }
+.back-btn { background:#999; color:#fff; }
+.action-btn { background:#007bff; color:#fff; }
+.reading-box { margin:10px 0; padding:10px; background:#fff; border-radius:8px; }
+.reading-box div { margin:5px 0; font-weight:bold; }
+.color-selector { display:flex; align-items:center; margin:5px 0; }
+.color-selector input { margin-left:10px; }
+</style>
+</head>
+<body>
+
+<!-- CASHIER SCREEN -->
+<div id="cashier-screen" style="display:flex; width:100%; height:100%;">
+  <div class="cart" id="cart"></div>
+  <div class="items" id="items"></div>
+</div>
+
+<div class="footer">
+  <div id="subtotal">Subtotal: ₱0</div>
+  <div id="total">Total: ₱0</div>
+  <div id="change">Change: ₱0</div>
+  <button class="cash-btn" onclick="cashTender(50)">₱50</button>
+  <button class="cash-btn" onclick="cashTender(100)">₱100</button>
+  <button class="cash-btn" onclick="cashTender(200)">₱200</button>
+  <button class="cash-btn" onclick="cashTender(500)">₱500</button>
+  <button class="cash-btn" onclick="cashTender(1000)">₱1000</button>
+  <input class="cash-input" type="number" id="customCash" placeholder="Enter ₱" oninput="customCashTender()">
+  <button class="pay-btn" onclick="payAndReset()">PAY & RESET</button>
+  <button class="cash-btn" onclick="showSupervisor()">Supervisor</button>
+</div>
+
+<!-- SUPERVISOR SCREEN -->
+<div class="supervisor-screen" id="supervisor-screen">
+  <h2>Supervisor Login</h2>
+  <p>Password: <input type="password" id="supPass"></p>
+  <button class="action-btn" onclick="loginSupervisor()">Login</button>
+  <button class="back-btn" onclick="hideSupervisor()">Back</button>
+
+  <div id="supContent" style="display:none;">
+    <!-- X/Z Readings -->
+    <div class="reading-box">
+      <div>X Reading: ₱<span id="xReading">0.0</span></div>
+      <div>Z Reading: ₱<span id="zReading">0.0</span></div>
+      <button class="action-btn" onclick="resetXReading()">Reset X / Update Z</button>
+    </div>
+
+    <h3>Change Supervisor Password</h3>
+    <input type="password" id="newPass" placeholder="New password">
+    <button class="action-btn" onclick="changeSupPass()">Update Password</button>
+
+    <h3>Manage Items</h3>
+    <input type="text" id="itemName" placeholder="Item Name">
+    <input type="number" id="itemPrice" placeholder="Price">
+    <div class="color-selector">
+      <label>Color:</label>
+      <input type="color" id="itemColor" value="#ff9999">
+      <select id="itemTextColor">
+        <option value="#000000">Black</option>
+        <option value="#ffffff">White</option>
+      </select>
+    </div>
+    <button class="action-btn" onclick="addItemSupervisor()">Add Item</button>
+    <div class="item-box" id="itemBox"></div>
+
+    <h3>Transaction Logs</h3>
+    <div class="log-box" id="logBox"></div>
+  </div>
+</div>
+
+<script>
+// POS Variables
+let cart = [];
+let tendered = 0;
+
+// Supervisor Data in localStorage
+if(!localStorage.getItem("SUPPASS")) localStorage.setItem("SUPPASS","pi123");
+if(!localStorage.getItem("ITEMS")) {
+  localStorage.setItem("ITEMS",JSON.stringify([
+    {name:"Burger", price:50, color:"#ff9999", text:"#000000"},
+    {name:"Fries", price:30, color:"#99ccff", text:"#000000"},
+    {name:"Coke", price:20, color:"#ffcc99", text:"#000000"},
+    {name:"Hotdog", price:40, color:"#99ff99", text:"#000000"},
+    {name:"Iced Tea", price:25, color:"#cc99ff", text:"#000000"}
+  ]));
+}
+
+// AUDIO
+const blipAdd = new Audio(); blipAdd.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA="; blipAdd.load();
+const blipRemove = new Audio(); blipRemove.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJMAAACABAAZGF0YQAAAAA="; blipRemove.load();
+const blipSup = new Audio(); blipSup.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA="; blipSup.load();
+
+function playBlipAdd(){ blipAdd.currentTime=0; blipAdd.play().catch(e=>console.log(e)); }
+function playBlipRemove(){ blipRemove.currentTime=0; blipRemove.play().catch(e=>console.log(e)); }
+function playBlipSup(){ blipSup.currentTime=0; blipSup.play().catch(e=>console.log(e)); }
+
+// Render Items
+function renderItems(){
+  const itemsDiv = document.getElementById("items");
+  itemsDiv.innerHTML="";
+  let items = JSON.parse(localStorage.getItem("ITEMS"));
+  items.forEach(i=>{
+    let btn = document.createElement("button");
+    btn.className="item-btn";
+    btn.style.background=i.color;
+    btn.style.color=i.text;
+    btn.innerText=`${i.name} - ₱${i.price}`;
+    btn.onclick=()=>addItemToCart(i.name,i.price);
+    itemsDiv.appendChild(btn);
+  });
+}
+
+// CART FUNCTIONS
+function addItemToCart(name, price){
+  let found = cart.find(i=>i.name===name);
+  if(found) found.qty++; else cart.push({name, price, qty:1});
+  playBlipAdd(); renderCart();
+}
+
+function cancelItem(index){
+  if(cart[index].qty>1) cart[index].qty--; else cart.splice(index,1);
+  playBlipRemove(); renderCart();
+}
+
+function renderCart(){
+  const cartDiv = document.getElementById("cart");
+  cartDiv.innerHTML="";
+  let subtotal=0;
+  cart.forEach((item,i)=>{
+    subtotal+=item.price*item.qty;
+    let div=document.createElement("div");
+    div.className="cart-item";
+    div.innerHTML=`<button class="cancel-btn" onclick="cancelItem(${i})">❌</button>${item.name} x${item.qty} = ₱${item.price*item.qty}`;
+    cartDiv.appendChild(div);
+  });
+  document.getElementById("subtotal").textContent="Subtotal: ₱"+subtotal;
+  document.getElementById("total").textContent="Total: ₱"+subtotal;
+  document.getElementById("change").textContent="Change: ₱"+Math.max(0,tendered-subtotal);
+}
+
+function cashTender(amount){ tendered=amount; document.getElementById("customCash").value=amount; renderCart(); }
+function customCashTender(){ let val=parseFloat(document.getElementById("customCash").value); tendered=isNaN(val)?0:val; renderCart(); }
+
+function payAndReset(){
+  if(cart.length===0){ alert("Cart is empty!"); return; }
+  let subtotal=cart.reduce((a,b)=>a+b.price*b.qty,0);
+  if(tendered<subtotal){ alert("Insufficient cash!"); return; }
+  let logs = JSON.parse(localStorage.getItem("logs")||"[]");
+  let date = new Date().toLocaleString();
+  logs.push({date, cart:[...cart], total:subtotal});
+  localStorage.setItem("logs",JSON.stringify(logs));
+  alert("Payment successful! Change: ₱"+(tendered-subtotal));
+  cart=[]; tendered=0; document.getElementById("customCash").value="";
+  renderCart();
+}
+
+// SUPERVISOR
+function showSupervisor(){ document.getElementById("supervisor-screen").style.display="flex"; }
+function hideSupervisor(){ document.getElementById("supervisor-screen").style.display="none"; document.getElementById("supContent").style.display="none"; document.getElementById("supPass").value=""; }
+
+function loginSupervisor(){
+  let pass = document.getElementById("supPass").value;
+  if(pass===localStorage.getItem("SUPPASS")){
+    document.getElementById("supContent").style.display="block";
+    loadItemsSupervisor(); loadLogs(); updateReadings();
+  } else alert("Wrong password");
+}
+
+function changeSupPass(){
+  let newPass = document.getElementById("newPass").value;
+  if(newPass===""){ alert("Enter a valid password"); return; }
+  localStorage.setItem("SUPPASS",newPass); alert("Password updated!"); document.getElementById("newPass").value="";
+}
+
+//// ITEM MANAGEMENT
+function loadItemsSupervisor(){
+  const itemBox = document.getElementById("itemBox");
+  itemBox.innerHTML="";
+  let items = JSON.parse(localStorage.getItem("ITEMS"));
+  items.forEach((i,index)=>{
+    let div = document.createElement("div");
+    div.style.display="flex"; div.style.justifyContent="space-between"; div.style.margin="4px 0"; div.style.alignItems="center";
+    div.innerHTML = `
+      ${i.name} - ₱${i.price} 
+      <div>
+        <button class="action-btn" onclick="editItem(${index})">Edit</button>
+        <button class="back-btn" onclick="removeItem(${index})">Remove</button>
+      </div>
+    `;
+    itemBox.appendChild(div);
+  });
+}
+
+function addItemSupervisor(){
+  let name = document.getElementById("itemName").value;
+  let price = parseFloat(document.getElementById("itemPrice").value);
+  let color = document.getElementById("itemColor").value;
+  let text = document.getElementById("itemTextColor").value;
+  if(!name || isNaN(price)){ alert("Enter valid name and price"); return; }
+  let items = JSON.parse(localStorage.getItem("ITEMS"));
+  items.push({name, price, color, text});
+  localStorage.setItem("ITEMS",JSON.stringify(items));
+  document.getElementById("itemName").value="";
+  document.getElementById("itemPrice").value="";
+  renderItems();
+  loadItemsSupervisor();
+  playBlipSup();
+}
+
+function editItem(index){
+  let items = JSON.parse(localStorage.getItem("ITEMS"));
+  let i = items[index];
+  let newName = prompt("Edit name:", i.name);
+  if(newName===null) return;
+  let newPrice = parseFloat(prompt("Edit price:", i.price));
+  if(isNaN(newPrice)) return;
+  let newColor = prompt("Edit color (hex):", i.color);
+  if(!newColor) return;
+  let newText = prompt("Edit text color (hex):", i.text);
+  if(!newText) return;
+  items[index]={name:newName, price:newPrice, color:newColor, text:newText};
+  localStorage.setItem("ITEMS",JSON.stringify(items));
+  renderItems();
+  loadItemsSupervisor();
+  playBlipSup();
+}
+
+function removeItem(index){
+  let items = JSON.parse(localStorage.getItem("ITEMS"));
+  if(confirm(`Remove ${items[index].name}?`)){
+    items.splice(index,1);
+    localStorage.setItem("ITEMS",JSON.stringify(items));
+    renderItems();
+    loadItemsSupervisor();
+    playBlipSup();
+  }
+}
+
+// TRANSACTION LOGS
+function loadLogs(){
+  let logs = JSON.parse(localStorage.getItem("logs")||"[]");
+  let logBox = document.getElementById("logBox");
+  logBox.innerHTML="";
+  // latest on top
+  logs.slice().reverse().forEach(l=>{
+    let entry = document.createElement("div");
+    entry.className="log-entry";
+    let itemsText = l.cart.map(i=>`${i.name} x${i.qty} = ₱${i.price*i.qty}`).join("<br>");
+    entry.innerHTML = `<div><b>${l.date}</b></div><div>${itemsText}</div><div><b>Total: ₱${l.total}</b></div>`;
+    logBox.appendChild(entry);
+  });
+}
+
+// READINGS (X & Z)
+function updateReadings(){
+  let logs = JSON.parse(localStorage.getItem("logs")||"[]");
+  let totalX = parseFloat(localStorage.getItem("XREADING")||"0");
+  let totalZ = parseFloat(localStorage.getItem("ZREADING")||"0");
+
+  // sum all logs to current X
+  let sumLogs = logs.reduce((sum,l)=>sum+l.total,0);
+  totalX = sumLogs;
+  document.getElementById("xReading").textContent = totalX.toFixed(2);
+  document.getElementById("zReading").textContent = totalZ.toFixed(2);
+}
+
+// Reset X and update Z
+function resetXReading(){
+  let x = parseFloat(document.getElementById("xReading").textContent);
+  let z = parseFloat(localStorage.getItem("ZREADING")||"0");
+  z += x;
+  localStorage.setItem("ZREADING", z.toFixed(2));
+  localStorage.setItem("XREADING", "0");
+  document.getElementById("xReading").textContent = "0.00";
+  document.getElementById("zReading").textContent = z.toFixed(2);
+
+  // add a log entry for X/Z reset
+  let logs = JSON.parse(localStorage.getItem("logs")||"[]");
+  let date = new Date().toLocaleString();
+  logs.push({date, cart:[{name:"X/Z RESET", qty:1, price:x}], total:x});
+  localStorage.setItem("logs",JSON.stringify(logs));
+  loadLogs();
+  playBlipSup();
+}
+
+// INITIAL RENDER
+renderItems();
+renderCart();
+updateReadings();
+</script>
+
+</body>
+</html>
