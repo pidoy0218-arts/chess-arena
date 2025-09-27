@@ -5,7 +5,6 @@
 <title>POS System - Full Supervisor + Park Sale</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-/* --- existing styles --- */
 body { margin:0; font-family:Arial, sans-serif; display:flex; height:100vh; }
 .cart, .items { padding:10px; box-sizing:border-box; }
 .cart { width:50%; background:#f9f9f9; overflow-y:auto; }
@@ -28,12 +27,9 @@ body { margin:0; font-family:Arial, sans-serif; display:flex; height:100vh; }
   border:1px dashed #999;
   margin-bottom:10px;
 }
-#receiptHeader:focus {
-  outline: 2px solid #007bff;
-  border-style: solid;
-}
+#receiptHeader:focus { outline: 2px solid #007bff; border-style: solid; }
 
-/* Supervisor overlay, parked sales (unchanged) */
+/* Supervisor overlay */
 .supervisor-screen {
   display:none; position:fixed; top:0; left:0; width:100%; height:100%;
   background:rgba(240,240,240,0.95); z-index:9999; padding:15px; flex-direction:column; overflow-y:auto;
@@ -45,10 +41,6 @@ body { margin:0; font-family:Arial, sans-serif; display:flex; height:100vh; }
 .back-btn, .action-btn { padding:6px 12px; margin:3px; border:none; border-radius:6px; cursor:pointer; }
 .back-btn { background:#999; color:#fff; }
 .action-btn { background:#007bff; color:#fff; }
-.reading-box { margin:10px 0; padding:10px; background:#fff; border-radius:8px; }
-.reading-box div { margin:5px 0; font-weight:bold; }
-.color-selector { display:flex; align-items:center; margin:5px 0; }
-.color-selector input { margin-left:10px; }
 .parked-box { margin-top:15px; padding:10px; background:#fff; border-radius:8px; max-height:250px; overflow-y:auto; }
 .park-entry { border-bottom:1px solid #ccc; padding:6px 0; }
 .park-entry:last-child { border-bottom:none; }
@@ -89,18 +81,80 @@ body { margin:0; font-family:Arial, sans-serif; display:flex; height:100vh; }
 
 <!-- SUPERVISOR SCREEN -->
 <div class="supervisor-screen" id="supervisor-screen">
-  <!-- (unchanged content of supervisor screen…) -->
+  <h2>Supervisor Panel</h2>
+  <div>
+    <input type="password" id="supervisorPass" placeholder="Enter Password">
+    <button class="action-btn" onclick="loginSupervisor()">Login</button>
+    <button class="back-btn" onclick="closeSupervisor()">Close</button>
+  </div>
+  <div id="supervisorContent" style="display:none;">
+    <h3>Manage Items</h3>
+    <div class="item-box" id="item-box"></div>
+    <button class="action-btn" onclick="addNewItem()">Add Item</button>
+
+    <h3>Transaction Logs</h3>
+    <div class="log-box" id="log-box"></div>
+
+    <h3>Parked Sales</h3>
+    <div class="parked-box" id="parked-box"></div>
+  </div>
 </div>
 
 <script>
-// keep all your existing POS logic here
-// just ensure renderCart() puts items under the header instead of replacing it
+let cart = [];
+let tendered = 0;
+let logs = [];
+let parkedSales = [];
+let supervisorPassword = "1234";
+
+let items = [
+  { name:"Burger", price:80, color:"#e74c3c" },
+  { name:"Fries", price:50, color:"#f39c12" },
+  { name:"Soda", price:30, color:"#3498db" }
+];
+
+window.onload = function(){
+  renderItems();
+  renderCart();
+};
+
+// Render item buttons
+function renderItems(){
+  const itemsDiv = document.getElementById("items");
+  itemsDiv.innerHTML = "";
+  items.forEach((it, idx)=>{
+    let btn = document.createElement("button");
+    btn.className="item-btn";
+    btn.style.background=it.color;
+    btn.textContent = it.name+" ₱"+it.price;
+    btn.onclick = ()=>addToCart(idx);
+    itemsDiv.appendChild(btn);
+  });
+}
+
+// Add to cart
+function addToCart(index){
+  let item = items[index];
+  let found = cart.find(c=>c.name===item.name);
+  if(found){ found.qty++; }
+  else{ cart.push({ ...item, qty:1 }); }
+  renderCart();
+}
+
+// Decrease qty
+function decreaseQty(index){
+  cart[index].qty--;
+  if(cart[index].qty<=0){ cart.splice(index,1); }
+  renderCart();
+}
+
+// Render cart
 function renderCart(){
   const cartDiv = document.getElementById("cart");
   const header = document.getElementById("receiptHeader");
-  // preserve header
-  cartDiv.innerHTML = header.outerHTML;  
-  document.getElementById("receiptHeader").innerHTML = header.innerHTML;
+
+  cartDiv.innerHTML = "";
+  cartDiv.appendChild(header);
 
   cart.forEach((item,index)=>{
     let div = document.createElement("div");
@@ -113,11 +167,106 @@ function renderCart(){
     cartDiv.appendChild(div);
   });
 
-  // update totals here
   let subtotal = cart.reduce((sum,i)=>sum+i.price*i.qty,0);
   document.getElementById("subtotal").textContent="Subtotal: ₱"+subtotal;
   document.getElementById("total").textContent="Total: ₱"+subtotal;
   document.getElementById("change").textContent="Change: ₱"+(tendered-subtotal);
+}
+
+// Cash tender
+function cashTender(amount){
+  tendered += amount;
+  renderCart();
+}
+function customCashTender(){
+  let val = parseFloat(document.getElementById("customCash").value) || 0;
+  tendered = val;
+  renderCart();
+}
+
+// Pay + reset
+function payAndReset(){
+  let subtotal = cart.reduce((sum,i)=>sum+i.price*i.qty,0);
+  if(cart.length===0){ alert("Cart is empty!"); return; }
+  logs.push({ time:new Date().toLocaleString(), items:[...cart], total:subtotal, paid:tendered });
+  alert("Payment complete. Change: ₱"+(tendered-subtotal));
+  cart=[];
+  tendered=0;
+  document.getElementById("customCash").value="";
+  renderCart();
+  renderLogs();
+}
+
+// Supervisor
+function showSupervisor(){ document.getElementById("supervisor-screen").style.display="flex"; }
+function closeSupervisor(){ document.getElementById("supervisor-screen").style.display="none"; }
+function loginSupervisor(){
+  let pass=document.getElementById("supervisorPass").value;
+  if(pass===supervisorPassword){
+    document.getElementById("supervisorContent").style.display="block";
+    renderItemsBox();
+    renderLogs();
+    renderParked();
+  } else { alert("Wrong password!"); }
+}
+function renderItemsBox(){
+  const box=document.getElementById("item-box");
+  box.innerHTML="";
+  items.forEach((it,i)=>{
+    let div=document.createElement("div");
+    div.textContent=`${it.name} - ₱${it.price}`;
+    box.appendChild(div);
+  });
+}
+function addNewItem(){
+  let n=prompt("Item name?");
+  let p=parseFloat(prompt("Price?"));
+  if(!n||isNaN(p)) return;
+  items.push({ name:n, price:p, color:"#555" });
+  renderItems();
+  renderItemsBox();
+}
+function renderLogs(){
+  const box=document.getElementById("log-box");
+  box.innerHTML="";
+  logs.forEach(l=>{
+    let div=document.createElement("div");
+    div.className="log-entry";
+    div.innerHTML=`${l.time}<br>Total: ₱${l.total} | Paid: ₱${l.paid}`;
+    box.appendChild(div);
+  });
+}
+
+// Park sale
+function parkSale(){
+  if(cart.length===0){ alert("Cart empty"); return; }
+  parkedSales.push([...cart]);
+  cart=[]; tendered=0;
+  renderCart();
+  renderParked();
+}
+function renderParked(){
+  const box=document.getElementById("parked-box");
+  box.innerHTML="";
+  parkedSales.forEach((sale,i)=>{
+    let div=document.createElement("div");
+    div.className="park-entry";
+    div.innerHTML=`Sale #${i+1} (${sale.length} items)
+      <div class="park-actions">
+        <button class="resume-btn" onclick="resumeSale(${i})">Resume</button>
+        <button class="clear-btn" onclick="clearSale(${i})">Clear</button>
+      </div>`;
+    box.appendChild(div);
+  });
+}
+function resumeSale(i){
+  cart=parkedSales[i];
+  parkedSales.splice(i,1);
+  renderCart(); renderParked();
+}
+function clearSale(i){
+  parkedSales.splice(i,1);
+  renderParked();
 }
 </script>
 </body>
