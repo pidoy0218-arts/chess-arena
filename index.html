@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Receipt Example</title>
+  <style>
+    body { font-family: monospace; margin: 20px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 5px; text-align: left; }
+    hr { border: none; border-top: 1px dashed #000; margin: 10px 0; }
+
+    /* Hide header on screen */
+    #storeHeader { display: none; }
+
+    /* Show only on print */
+    @media print {
+      #storeHeader {
+        display: block;
+        text-align: center;
+        margin-bottom: 10px;
+        font-weight: bold;
+      }
+      #editHeaderBtn {
+        display: none; /* hide edit button on print */
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Editable store header (hidden on screen, visible on print) -->
+  <div id="storeHeader" contenteditable="true">
+    My Store Name<br>
+    Address Line<br>
+    Contact Number
+  </div>
+
+  <table border="1">
+    <tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr>
+    <tr><td>Apple</td><td>2</td><td>₱25</td><td>₱50</td></tr>
+    <tr><td>Orange</td><td>3</td><td>₱30</td><td>₱90</td></tr>
+  </table>
+  <hr>
+  <p><b>Grand Total: ₱140</b></p>
+
+  <button id="editHeaderBtn" onclick="toggleHeader()">Edit Store Header</button>
+  <button onclick="window.print()">🖨 Print Receipt</button>
+
+  <script>
+    function toggleHeader() {
+      const header = document.getElementById("storeHeader");
+      if (header.style.display === "none") {
+        header.style.display = "block";
+      } else {
+        header.style.display = "none";
+      }
+    }
+  </script>
+</body>
+</html>
