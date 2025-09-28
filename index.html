@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>POS System with Unlimited Park/Recall</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body { margin:0; font-family:Arial, sans-serif; display:flex; height:100vh; }
+.cart, .items { padding:10px; box-sizing:border-box; }
+.cart { width:50%; background:#f9f9f9; overflow-y:auto; }
+.items { width:50%; background:#fff; overflow-y:auto; display:flex; flex-direction:column; max-height:calc(100vh - 100px); }
+.item-btn { padding:20px; margin:5px 0; font-size:20px; border:none; border-radius:8px; color:#fff; cursor:pointer; }
+.cart-item { display:flex; align-items:center; justify-content:space-between; padding:8px; margin:4px 0; background:#eee; border-radius:6px; }
+.cancel-btn { background:#999; color:#fff; border:none; border-radius:4px; padding:2px 6px; margin-right:8px; cursor:pointer; font-size:14px; }
+.footer { position:absolute; bottom:0; left:0; width:100%; background:#222; color:#fff; padding:10px; display:flex; flex-wrap:wrap; align-items:center; }
+.footer div { margin:5px 10px; font-size:18px; }
+.cash-btn { padding:10px 20px; margin:3px; border:none; border-radius:6px; background:#007bff; color:#fff; font-size:16px; cursor:pointer; }
+.pay-btn { padding:10px 20px; margin:3px; border:none; border-radius:6px; background:#28a745; color:#fff; font-size:18px; flex:1; }
+.cash-input { padding:10px; margin:3px; border-radius:6px; border:1px solid #ccc; font-size:16px; width:120px; }
+
+/* Recall Popup */
+#recallPopup {
+  display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(0,0,0,0.7); z-index:10000; justify-content:center; align-items:center;
+}
+#recallBox {
+  background:#fff; padding:20px; border-radius:10px; width:300px; max-height:80%; overflow-y:auto;
+}
+.park-entry { border-bottom:1px solid #ccc; padding:10px 0; display:flex; justify-content:space-between; align-items:center; }
+.park-entry:last-child { border:none; }
+.resume-btn { background:#28a745; color:#fff; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; margin-right:5px; }
+.clear-btn { background:#dc3545; color:#fff; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; }
+.close-btn { margin-top:10px; background:#999; color:#fff; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<!-- CASHIER SCREEN -->
+<div id="cashier-screen" style="display:flex; width:100%; height:100%;">
+  <div class="cart" id="cart"></div>
+  <div class="items" id="items"></div>
+</div>
+
+<div class="footer">
+  <div id="subtotal">Subtotal: ₱0</div>
+  <div id="total">Total: ₱0</div>
+  <div id="change">Change: ₱0</div>
+  <button class="cash-btn" onclick="cashTender(50)">₱50</button>
+  <button class="cash-btn" onclick="cashTender(100)">₱100</button>
+  <button class="cash-btn" onclick="cashTender(200)">₱200</button>
+  <button class="cash-btn" onclick="cashTender(500)">₱500</button>
+  <button class="cash-btn" onclick="cashTender(1000)">₱1000</button>
+  <input class="cash-input" type="number" id="customCash" placeholder="Enter ₱" oninput="customCashTender()">
+  <button class="pay-btn" onclick="payAndReset()">PAY & RESET</button>
+  <button class="cash-btn" onclick="parkSale()">Park Sale</button>
+  <button class="cash-btn" onclick="showRecall()">Recall Sale</button>
+</div>
+
+<!-- Recall Popup -->
+<div id="recallPopup">
+  <div id="recallBox">
+    <h3>Parked Sales</h3>
+    <div id="parkedList"></div>
+    <button class="close-btn" onclick="closeRecall()">Close</button>
+  </div>
+</div>
+
+<script>
+let cart = [];
+let tendered = 0;
+let parkedSales = [];
+let customerCounter = 1;
+let activeCustomer = null;
+
+function renderCart(){
+  const cartDiv = document.getElementById("cart");
+  cartDiv.innerHTML = "";
+  cart.forEach((item,index)=>{
+    let div = document.createElement("div");
+    div.className="cart-item";
+    div.innerHTML=`
+      <button class="cancel-btn" onclick="decreaseQty(${index})">❌</button>
+      <span>${item.name} x${item.qty}</span>
+      <span>₱${item.price*item.qty}</span>
+    `;
+    cartDiv.appendChild(div);
+  });
+  let subtotal = cart.reduce((sum,i)=>sum+i.price*i.qty,0);
+  document.getElementById("subtotal").textContent="Subtotal: ₱"+subtotal;
+  document.getElementById("total").textContent="Total: ₱"+subtotal;
+  document.getElementById("change").textContent="Change: ₱"+(tendered-subtotal);
+}
+
+function addItem(name, price){
+  let found = cart.find(i=>i.name===name);
+  if(found){ found.qty++; } else { cart.push({name,price,qty:1}); }
+  renderCart();
+}
+function decreaseQty(index){
+  if(cart[index].qty>1){ cart[index].qty--; }
+  else{ cart.splice(index,1); }
+  renderCart();
+}
+function cashTender(amount){ tendered += amount; renderCart(); }
+function customCashTender(){
+  tendered = parseFloat(document.getElementById("customCash").value)||0;
+  renderCart();
+}
+
+function payAndReset(){
+  if(cart.length===0) return;
+  if(activeCustomer !== null){
+    parkedSales = parkedSales.filter(s=>s.id!==activeCustomer);
+  }
+  cart = []; tendered = 0; activeCustomer=null;
+  renderCart();
+  updateParkedList();
+}
+
+function parkSale(){
+  if(cart.length===0) return;
+  let id = "Customer "+customerCounter++;
+  parkedSales.push({id,items:JSON.parse(JSON.stringify(cart))});
+  cart=[]; tendered=0; activeCustomer=null;
+  renderCart();
+  updateParkedList();
+}
+
+function showRecall(){
+  document.getElementById("recallPopup").style.display="flex";
+  updateParkedList();
+}
+function closeRecall(){
+  document.getElementById("recallPopup").style.display="none";
+}
+function updateParkedList(){
+  let div=document.getElementById("parkedList");
+  div.innerHTML="";
+  parkedSales.forEach(s=>{
+    let row=document.createElement("div");
+    row.className="park-entry";
+    row.innerHTML=`
+      <span>${s.id}</span>
+      <div>
+        <button class="resume-btn" onclick="resumeSale('${s.id}')">Resume</button>
+        <button class="clear-btn" onclick="clearSale('${s.id}')">Clear</button>
+      </div>
+    `;
+    div.appendChild(row);
+  });
+}
+function resumeSale(id){
+  let sale=parkedSales.find(s=>s.id===id);
+  if(!sale) return;
+  cart=JSON.parse(JSON.stringify(sale.items));
+  activeCustomer=id;
+  renderCart();
+  closeRecall();
+}
+function clearSale(id){
+  parkedSales=parkedSales.filter(s=>s.id!==id);
+  updateParkedList();
+}
+</script>
+</body>
+</html>
