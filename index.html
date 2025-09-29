@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>POS System - Park Sales by Customer</title>
+<title>POS System - Supervisor + Parked Customers</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 body { margin:0; font-family:Arial, sans-serif; display:flex; height:100vh; }
@@ -43,8 +43,7 @@ body { margin:0; font-family:Arial, sans-serif; display:flex; height:100vh; }
 }
 #receiptHeader:focus { outline:2px solid #007bff; border-style:solid; }
 
-/* Parked customers popup */
-#parked-screen { display:none; }
+/* Parked customers */
 .parked-box { margin-top:10px; }
 .park-entry { border:1px solid #ccc; border-radius:6px; margin:4px 0; padding:6px; background:#fff; }
 .park-actions button { margin:2px; padding:4px 8px; border:none; border-radius:4px; cursor:pointer; }
@@ -78,15 +77,12 @@ body { margin:0; font-family:Arial, sans-serif; display:flex; height:100vh; }
   <button class="cash-btn" onclick="cashTender(1000)">₱1000</button>
   <input class="cash-input" type="number" id="customCash" placeholder="Enter ₱" oninput="customCashTender()">
   <button class="pay-btn" onclick="payAndReset()">PAY & RESET</button>
-  <button class="cash-btn" onclick="showPark()">Park</button>
   <button class="cash-btn" onclick="showSupervisor()">Supervisor</button>
 </div>
 
-<!-- PARKED CUSTOMERS POPUP -->
-<div class="supervisor-screen" id="parked-screen">
-  <h2>Parked Customers</h2>
-  <div id="parkedBox"></div>
-  <button class="back-btn" onclick="hidePark()">Close</button>
+<!-- Parked Sales (Customer slots) -->
+<div class="parked-box" id="parkedBox">
+  <h3>Parked Customers</h3>
 </div>
 
 <!-- SUPERVISOR SCREEN -->
@@ -138,14 +134,10 @@ if(!localStorage.getItem("HEADER")){
 }
 document.getElementById("receiptHeader").innerHTML = localStorage.getItem("HEADER");
 
-// Park popup
-function showPark(){ document.getElementById("parked-screen").style.display="flex"; renderParked(); }
-function hidePark(){ document.getElementById("parked-screen").style.display="none"; }
-
 // Parked customers render
 function renderParked(){
   const pb=document.getElementById("parkedBox");
-  pb.innerHTML="<h3>Customer Slots</h3>";
+  pb.innerHTML="<h3>Parked Customers</h3>";
   for(let c=1;c<=10;c++){
     let div=document.createElement("div");
     div.className="park-entry";
@@ -159,22 +151,22 @@ function renderParked(){
 }
 
 // Park/Resume
-function parkSale(cust){
+function parkSale(customer){
   if(cart.length===0){ alert("No items to park"); return; }
-  parked[cust]=[...cart];
+  parked[customer]=[...cart];
   localStorage.setItem("PARKED",JSON.stringify(parked));
   cart=[]; renderCart();
 }
-function resumeSale(cust){
-  if(parked[cust]){
-    cart=[...parked[cust]];
-    delete parked[cust];
+function resumeSale(customer){
+  if(parked[customer]){
+    cart=[...parked[customer]];
+    delete parked[customer];
     localStorage.setItem("PARKED",JSON.stringify(parked));
     renderCart();
-  } else alert("No sale parked on Customer "+cust);
+  } else alert("No sale parked for Customer "+customer);
 }
-function clearSale(cust){
-  delete parked[cust];
+function clearSale(customer){
+  delete parked[customer];
   localStorage.setItem("PARKED",JSON.stringify(parked));
   renderParked();
 }
@@ -212,6 +204,7 @@ function renderCart(){
   document.getElementById("subtotal").textContent="Subtotal: ₱"+subtotal;
   document.getElementById("total").textContent="Total: ₱"+subtotal;
   document.getElementById("change").textContent="Change: ₱"+Math.max(0,tendered-subtotal);
+  renderParked();
 }
 
 // Tender
@@ -221,24 +214,11 @@ function payAndReset(){
   if(cart.length===0){ alert("Cart empty"); return; }
   let s=cart.reduce((a,b)=>a+b.price*b.qty,0);
   if(tendered<s){ alert("Insufficient cash"); return; }
-
   let logs=JSON.parse(localStorage.getItem("logs")||"[]");
   logs.push({date:new Date().toLocaleString(),cart:[...cart],total:s});
   localStorage.setItem("logs",JSON.stringify(logs));
-
   alert("Paid. Change: ₱"+(tendered-s));
-
-  // auto-clear if parked
-  for(let c in parked){
-    if(JSON.stringify(parked[c])===JSON.stringify(cart)){
-      delete parked[c];
-      localStorage.setItem("PARKED",JSON.stringify(parked));
-      break;
-    }
-  }
-
-  cart=[]; tendered=0; document.getElementById("customCash").value="";
-  renderCart();
+  cart=[]; tendered=0; document.getElementById("customCash").value=""; renderCart();
 }
 
 // Supervisor
@@ -275,12 +255,15 @@ function addItemSupervisor(){
   if(!n||isNaN(p)) return alert("Invalid");
   let it=JSON.parse(localStorage.getItem("ITEMS")); it.push({name:n,price:p,color:c,text:t});
   localStorage.setItem("ITEMS",JSON.stringify(it)); renderItems(); loadItemsSupervisor();
+  document.getElementById("itemName").value=""; document.getElementById("itemPrice").value="";
 }
 function loadItemsSupervisor(){
   const box=document.getElementById("itemBox"); box.innerHTML="";
   JSON.parse(localStorage.getItem("ITEMS")).forEach((i,idx)=>{
     let d=document.createElement("div");
-    d.innerHTML=`${i.name} - ₱${i.price} 
+    d.innerHTML=`
+      ${i.name} - ₱${i.price} 
+      <button onclick="editItem(${idx})">Edit</button>
       <button onclick="removeItem(${idx})">Remove</button>`;
     box.appendChild(d);
   });
@@ -289,6 +272,35 @@ function removeItem(idx){
   let it=JSON.parse(localStorage.getItem("ITEMS"));
   it.splice(idx,1); localStorage.setItem("ITEMS",JSON.stringify(it));
   renderItems(); loadItemsSupervisor();
+}
+function editItem(idx){
+  let it=JSON.parse(localStorage.getItem("ITEMS"));
+  let item=it[idx];
+
+  document.getElementById("itemName").value=item.name;
+  document.getElementById("itemPrice").value=item.price;
+  document.getElementById("itemColor").value=item.color;
+  document.getElementById("itemTextColor").value=item.text;
+
+  const addBtn=document.querySelector("button[onclick='addItemSupervisor()']");
+  addBtn.textContent="Update Item";
+  addBtn.onclick=function(){
+    item.name=document.getElementById("itemName").value;
+    item.price=parseFloat(document.getElementById("itemPrice").value);
+    item.color=document.getElementById("itemColor").value;
+    item.text=document.getElementById("itemTextColor").value;
+
+    it[idx]=item;
+    localStorage.setItem("ITEMS",JSON.stringify(it));
+
+    renderItems(); loadItemsSupervisor();
+
+    addBtn.textContent="Add Item";
+    addBtn.onclick=addItemSupervisor;
+
+    document.getElementById("itemName").value="";
+    document.getElementById("itemPrice").value="";
+  };
 }
 
 // Logs
@@ -304,7 +316,7 @@ function loadLogs(){
 }
 
 // Init
-renderItems(); renderCart();
+renderItems(); renderCart(); renderParked();
 </script>
 </body>
 </html>
