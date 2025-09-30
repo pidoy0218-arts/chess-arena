@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>POS System - Supervisor + Parked Customers</title>
+<title>POS System - Editable Header + Park Sale</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 body { margin:0; font-family:Arial, sans-serif; display:flex; height:100vh; }
@@ -11,44 +11,30 @@ body { margin:0; font-family:Arial, sans-serif; display:flex; height:100vh; }
 .items { width:50%; background:#fff; overflow-y:auto; display:flex; flex-direction:column; max-height:calc(100vh - 100px); }
 .item-btn { padding:20px; margin:5px 0; font-size:20px; border:none; border-radius:8px; color:#fff; cursor:pointer; }
 .cart-item { display:flex; align-items:center; justify-content:space-between; padding:8px; margin:4px 0; background:#eee; border-radius:6px; }
-.cancel-btn { background:#999; color:#fff; border:none; border-radius:4px; padding:2px 6px; margin-right:8px; cursor:pointer; font-size:14px; }
+.cancel-btn, .edit-btn { border:none; border-radius:4px; padding:2px 6px; margin-right:6px; cursor:pointer; font-size:14px; }
+.cancel-btn { background:#dc3545; color:#fff; }
+.edit-btn { background:#ffc107; color:#000; }
 .footer { position:absolute; bottom:0; left:0; width:100%; background:#222; color:#fff; padding:10px; display:flex; flex-wrap:wrap; align-items:center; }
 .footer div { margin:5px 10px; font-size:18px; }
 .cash-btn { padding:10px 20px; margin:3px; border:none; border-radius:6px; background:#007bff; color:#fff; font-size:16px; cursor:pointer; }
 .pay-btn { padding:10px 20px; margin:3px; border:none; border-radius:6px; background:#28a745; color:#fff; font-size:18px; flex:1; }
 .cash-input { padding:10px; margin:3px; border-radius:6px; border:1px solid #ccc; font-size:16px; width:120px; }
 
-/* Supervisor overlay */
-.supervisor-screen {
-  display:none; position:fixed; top:0; left:0; width:100%; height:100%;
-  background:rgba(240,240,240,0.95); z-index:9999;
-  padding:15px; flex-direction:column; overflow-y:auto;
-}
-.supervisor-screen h2 { margin-top:0; }
-.log-box, .item-box { max-height:400px; overflow-y:auto; background:#fff; padding:10px; border-radius:8px; margin-top:10px; }
-.log-entry { border-bottom:1px solid #ccc; padding:6px 0; }
-.log-entry:last-child { border-bottom:none; }
-.back-btn, .action-btn { padding:6px 12px; margin:3px; border:none; border-radius:6px; cursor:pointer; }
-.back-btn { background:#999; color:#fff; }
-.action-btn { background:#007bff; color:#fff; }
-.reading-box { margin:10px 0; padding:10px; background:#fff; border-radius:8px; }
-.reading-box div { margin:5px 0; font-weight:bold; }
-.color-selector { display:flex; align-items:center; margin:5px 0; }
-.color-selector input { margin-left:10px; }
-
 /* Editable receipt header */
-#receiptHeader {
-  text-align:center; font-weight:bold; font-size:18px;
-  padding:10px; border:1px dashed #999; margin-bottom:10px;
-}
-#receiptHeader:focus { outline:2px solid #007bff; border-style:solid; }
+#receiptHeader { text-align:center; font-weight:bold; font-size:18px; padding:10px; border:1px dashed #999; margin-bottom:10px; }
+#receiptHeader:focus { outline: 2px solid #007bff; border-style: solid; }
 
-/* Parked customers */
-.parked-box { margin-top:10px; }
-.park-entry { border:1px solid #ccc; border-radius:6px; margin:4px 0; padding:6px; background:#fff; }
-.park-actions button { margin:2px; padding:4px 8px; border:none; border-radius:4px; cursor:pointer; }
-.resume-btn { background:#28a745; color:#fff; }
-.clear-btn { background:#dc3545; color:#fff; }
+/* Parked sales popup */
+#parkPopup {
+  display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(0,0,0,0.6); z-index:10000; align-items:center; justify-content:center;
+}
+#parkContent {
+  background:#fff; padding:15px; border-radius:8px; width:90%; max-width:400px;
+  max-height:80%; overflow-y:auto;
+}
+.park-entry { display:flex; justify-content:space-between; align-items:center; padding:6px; border-bottom:1px solid #ccc; }
+.resume-btn { background:#28a745; color:#fff; border:none; border-radius:4px; padding:4px 8px; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -56,7 +42,7 @@ body { margin:0; font-family:Arial, sans-serif; display:flex; height:100vh; }
 <!-- CASHIER SCREEN -->
 <div id="cashier-screen" style="display:flex; width:100%; height:100%;">
   <div class="cart" id="cart">
-    <!-- Editable Header -->
+    <!-- Editable Receipt Header -->
     <div id="receiptHeader" contenteditable="true">
       Store Name<br>
       Address Line<br>
@@ -77,246 +63,104 @@ body { margin:0; font-family:Arial, sans-serif; display:flex; height:100vh; }
   <button class="cash-btn" onclick="cashTender(1000)">₱1000</button>
   <input class="cash-input" type="number" id="customCash" placeholder="Enter ₱" oninput="customCashTender()">
   <button class="pay-btn" onclick="payAndReset()">PAY & RESET</button>
-  <button class="cash-btn" onclick="showSupervisor()">Supervisor</button>
+  <button class="cash-btn" onclick="showParked()">Parked Sales</button>
 </div>
 
-<!-- Parked Sales (Customer slots) -->
-<div class="parked-box" id="parkedBox">
-  <h3>Parked Customers</h3>
-</div>
-
-<!-- SUPERVISOR SCREEN -->
-<div class="supervisor-screen" id="supervisor-screen">
-  <h2>Supervisor Login</h2>
-  <p>Password: <input type="password" id="supPass"></p>
-  <button class="action-btn" onclick="loginSupervisor()">Login</button>
-  <button class="back-btn" onclick="hideSupervisor()">Back</button>
-
-  <div id="supContent" style="display:none;">
-    <div class="reading-box">
-      <div>X Reading: ₱<span id="xReading">0.0</span></div>
-      <div>Z Reading: ₱<span id="zReading">0.0</span></div>
-      <button class="action-btn" onclick="resetXReading()">Reset X / Update Z</button>
-    </div>
-
-    <h3>Edit Receipt Header</h3>
-    <textarea id="headerEdit" rows="4" style="width:100%;"></textarea>
-    <button class="action-btn" onclick="saveHeader()">Save Header</button>
-
-    <h3>Manage Items</h3>
-    <input type="text" id="itemName" placeholder="Item Name">
-    <input type="number" id="itemPrice" placeholder="Price">
-    <div class="color-selector">
-      <label>Color:</label>
-      <input type="color" id="itemColor" value="#ff9999">
-      <select id="itemTextColor">
-        <option value="#000000">Black</option>
-        <option value="#ffffff">White</option>
-      </select>
-    </div>
-    <button class="action-btn" onclick="addItemSupervisor()">Add Item</button>
-    <div class="item-box" id="itemBox"></div>
-
-    <h3>Transaction Logs</h3>
-    <div class="log-box" id="logBox"></div>
+<!-- Park Sale Popup -->
+<div id="parkPopup">
+  <div id="parkContent">
+    <h3>Parked Sales</h3>
+    <div id="parkList"></div>
+    <button onclick="closePark()" style="margin-top:10px; padding:6px 12px;">Close</button>
   </div>
 </div>
 
 <script>
-// POS Vars
 let cart = [];
 let tendered = 0;
-let parked = JSON.parse(localStorage.getItem("PARKED")||"{}"); // {customer:[items]}
+let parked = {}; // { customerName: [items] }
+let parkCounter = 1;
 
-// Header
-if(!localStorage.getItem("HEADER")){
-  localStorage.setItem("HEADER","Store Name<br>Address Line<br>Contact Info");
+function renderCart(){
+  const cartDiv = document.getElementById("cart");
+  const header = document.getElementById("receiptHeader");
+  cartDiv.innerHTML = header.outerHTML;
+  document.getElementById("receiptHeader").innerHTML = header.innerHTML;
+
+  cart.forEach((item,index)=>{
+    let div = document.createElement("div");
+    div.className="cart-item";
+    div.innerHTML=`
+      <button class="edit-btn" onclick="editQty(${index})">✏️</button>
+      <button class="cancel-btn" onclick="removeItem(${index})">❌</button>
+      <span>${item.name} x${item.qty}</span>
+      <span>₱${item.price*item.qty}</span>
+    `;
+    cartDiv.appendChild(div);
+  });
+
+  let subtotal = cart.reduce((sum,i)=>sum+i.price*i.qty,0);
+  document.getElementById("subtotal").textContent="Subtotal: ₱"+subtotal;
+  document.getElementById("total").textContent="Total: ₱"+subtotal;
+  document.getElementById("change").textContent="Change: ₱"+(tendered-subtotal);
 }
-document.getElementById("receiptHeader").innerHTML = localStorage.getItem("HEADER");
 
-// Parked customers render
-function renderParked(){
-  const pb=document.getElementById("parkedBox");
-  pb.innerHTML="<h3>Parked Customers</h3>";
-  for(let c=1;c<=10;c++){
+function cashTender(amount){ tendered+=amount; renderCart(); }
+function customCashTender(){ tendered=parseFloat(document.getElementById("customCash").value)||0; renderCart(); }
+
+function removeItem(i){ cart.splice(i,1); renderCart(); }
+function editQty(i){
+  let newQty = prompt("Enter new qty:", cart[i].qty);
+  if(newQty && !isNaN(newQty)){ cart[i].qty = parseInt(newQty); renderCart(); }
+}
+
+function payAndReset(){
+  if(cart.length===0){ alert("Cart empty"); return; }
+  let subtotal = cart.reduce((s,i)=>s+i.price*i.qty,0);
+  if(tendered<subtotal){ alert("Insufficient payment"); return; }
+  alert("Payment successful! Change: ₱"+(tendered-subtotal));
+  cart=[]; tendered=0;
+  // clear this customer if loaded from parked
+  if(currentCustomer){
+    delete parked[currentCustomer];
+    currentCustomer=null;
+  }
+  renderCart(); updateParkList();
+}
+
+// --- Park sale handling ---
+let currentCustomer=null;
+
+function parkSale(){
+  if(cart.length===0){ alert("Nothing to park"); return; }
+  let name="Customer"+parkCounter++;
+  parked[name]=JSON.parse(JSON.stringify(cart));
+  cart=[]; tendered=0; renderCart(); updateParkList();
+}
+
+function showParked(){
+  document.getElementById("parkPopup").style.display="flex";
+  updateParkList();
+}
+function closePark(){ document.getElementById("parkPopup").style.display="none"; }
+
+function updateParkList(){
+  const list=document.getElementById("parkList");
+  list.innerHTML="";
+  for(let c in parked){
     let div=document.createElement("div");
     div.className="park-entry";
-    div.innerHTML=`<b>Customer ${c}</b><div class="park-actions">
-      <button class="resume-btn" onclick="resumeSale(${c})">Resume</button>
-      <button class="clear-btn" onclick="clearSale(${c})">Clear</button>
-      <button class="action-btn" onclick="parkSale(${c})">Park</button>
-    </div>`;
-    pb.appendChild(div);
+    div.innerHTML=`<span>${c} (${parked[c].length} items)</span>
+      <button class="resume-btn" onclick="resumeCart('${c}')">Resume</button>`;
+    list.appendChild(div);
   }
 }
 
-// Park/Resume
-function parkSale(customer){
-  if(cart.length===0){ alert("No items to park"); return; }
-  parked[customer]=[...cart];
-  localStorage.setItem("PARKED",JSON.stringify(parked));
-  cart=[]; renderCart();
+function resumeCart(cust){
+  cart=JSON.parse(JSON.stringify(parked[cust]));
+  currentCustomer=cust;
+  closePark(); renderCart();
 }
-function resumeSale(customer){
-  if(parked[customer]){
-    cart=[...parked[customer]];
-    delete parked[customer];
-    localStorage.setItem("PARKED",JSON.stringify(parked));
-    renderCart();
-  } else alert("No sale parked for Customer "+customer);
-}
-function clearSale(customer){
-  delete parked[customer];
-  localStorage.setItem("PARKED",JSON.stringify(parked));
-  renderParked();
-}
-
-// Save header
-function saveHeader(){
-  let h=document.getElementById("headerEdit").value;
-  localStorage.setItem("HEADER",h);
-  document.getElementById("receiptHeader").innerHTML=h;
-  alert("Header updated");
-}
-
-// Cart
-function addItemToCart(name, price){
-  let f=cart.find(i=>i.name===name);
-  if(f) f.qty++; else cart.push({name,price,qty:1});
-  renderCart();
-}
-function cancelItem(i){
-  if(cart[i].qty>1) cart[i].qty--; else cart.splice(i,1);
-  renderCart();
-}
-function renderCart(){
-  const cartDiv=document.getElementById("cart");
-  const header=localStorage.getItem("HEADER");
-  cartDiv.innerHTML=`<div id="receiptHeader" contenteditable="true">${header}</div>`;
-  let subtotal=0;
-  cart.forEach((it,i)=>{
-    subtotal+=it.price*it.qty;
-    let d=document.createElement("div");
-    d.className="cart-item";
-    d.innerHTML=`<button class="cancel-btn" onclick="cancelItem(${i})">❌</button>${it.name} x${it.qty} = ₱${it.price*it.qty}`;
-    cartDiv.appendChild(d);
-  });
-  document.getElementById("subtotal").textContent="Subtotal: ₱"+subtotal;
-  document.getElementById("total").textContent="Total: ₱"+subtotal;
-  document.getElementById("change").textContent="Change: ₱"+Math.max(0,tendered-subtotal);
-  renderParked();
-}
-
-// Tender
-function cashTender(a){ tendered=a; document.getElementById("customCash").value=a; renderCart(); }
-function customCashTender(){ let v=parseFloat(document.getElementById("customCash").value); tendered=isNaN(v)?0:v; renderCart(); }
-function payAndReset(){
-  if(cart.length===0){ alert("Cart empty"); return; }
-  let s=cart.reduce((a,b)=>a+b.price*b.qty,0);
-  if(tendered<s){ alert("Insufficient cash"); return; }
-  let logs=JSON.parse(localStorage.getItem("logs")||"[]");
-  logs.push({date:new Date().toLocaleString(),cart:[...cart],total:s});
-  localStorage.setItem("logs",JSON.stringify(logs));
-  alert("Paid. Change: ₱"+(tendered-s));
-  cart=[]; tendered=0; document.getElementById("customCash").value=""; renderCart();
-}
-
-// Supervisor
-function showSupervisor(){ document.getElementById("supervisor-screen").style.display="flex"; }
-function hideSupervisor(){ document.getElementById("supervisor-screen").style.display="none"; document.getElementById("supContent").style.display="none"; }
-if(!localStorage.getItem("SUPPASS")) localStorage.setItem("SUPPASS","pi123");
-function loginSupervisor(){
-  if(document.getElementById("supPass").value===localStorage.getItem("SUPPASS")){
-    document.getElementById("supContent").style.display="block";
-    document.getElementById("headerEdit").value=localStorage.getItem("HEADER");
-    loadItemsSupervisor(); loadLogs();
-  } else alert("Wrong password");
-}
-
-// Items
-if(!localStorage.getItem("ITEMS")){
-  localStorage.setItem("ITEMS",JSON.stringify([{name:"Burger",price:50,color:"#ff9999",text:"#000"}]));
-}
-function renderItems(){
-  const d=document.getElementById("items"); d.innerHTML="";
-  JSON.parse(localStorage.getItem("ITEMS")).forEach(i=>{
-    let b=document.createElement("button");
-    b.className="item-btn"; b.style.background=i.color; b.style.color=i.text;
-    b.textContent=`${i.name} - ₱${i.price}`;
-    b.onclick=()=>addItemToCart(i.name,i.price);
-    d.appendChild(b);
-  });
-}
-function addItemSupervisor(){
-  let n=document.getElementById("itemName").value;
-  let p=parseFloat(document.getElementById("itemPrice").value);
-  let c=document.getElementById("itemColor").value;
-  let t=document.getElementById("itemTextColor").value;
-  if(!n||isNaN(p)) return alert("Invalid");
-  let it=JSON.parse(localStorage.getItem("ITEMS")); it.push({name:n,price:p,color:c,text:t});
-  localStorage.setItem("ITEMS",JSON.stringify(it)); renderItems(); loadItemsSupervisor();
-  document.getElementById("itemName").value=""; document.getElementById("itemPrice").value="";
-}
-function loadItemsSupervisor(){
-  const box=document.getElementById("itemBox"); box.innerHTML="";
-  JSON.parse(localStorage.getItem("ITEMS")).forEach((i,idx)=>{
-    let d=document.createElement("div");
-    d.innerHTML=`
-      ${i.name} - ₱${i.price} 
-      <button onclick="editItem(${idx})">Edit</button>
-      <button onclick="removeItem(${idx})">Remove</button>`;
-    box.appendChild(d);
-  });
-}
-function removeItem(idx){
-  let it=JSON.parse(localStorage.getItem("ITEMS"));
-  it.splice(idx,1); localStorage.setItem("ITEMS",JSON.stringify(it));
-  renderItems(); loadItemsSupervisor();
-}
-function editItem(idx){
-  let it=JSON.parse(localStorage.getItem("ITEMS"));
-  let item=it[idx];
-
-  document.getElementById("itemName").value=item.name;
-  document.getElementById("itemPrice").value=item.price;
-  document.getElementById("itemColor").value=item.color;
-  document.getElementById("itemTextColor").value=item.text;
-
-  const addBtn=document.querySelector("button[onclick='addItemSupervisor()']");
-  addBtn.textContent="Update Item";
-  addBtn.onclick=function(){
-    item.name=document.getElementById("itemName").value;
-    item.price=parseFloat(document.getElementById("itemPrice").value);
-    item.color=document.getElementById("itemColor").value;
-    item.text=document.getElementById("itemTextColor").value;
-
-    it[idx]=item;
-    localStorage.setItem("ITEMS",JSON.stringify(it));
-
-    renderItems(); loadItemsSupervisor();
-
-    addBtn.textContent="Add Item";
-    addBtn.onclick=addItemSupervisor;
-
-    document.getElementById("itemName").value="";
-    document.getElementById("itemPrice").value="";
-  };
-}
-
-// Logs
-function loadLogs(){
-  let logs=JSON.parse(localStorage.getItem("logs")||"[]");
-  const box=document.getElementById("logBox"); box.innerHTML="";
-  logs.slice().reverse().forEach(l=>{
-    let e=document.createElement("div");
-    e.className="log-entry";
-    e.innerHTML=`<b>${l.date}</b><br>${l.cart.map(i=>`${i.name} x${i.qty} = ₱${i.price*i.qty}`).join("<br>")}<br><b>Total: ₱${l.total}</b>`;
-    box.appendChild(e);
-  });
-}
-
-// Init
-renderItems(); renderCart(); renderParked();
 </script>
 </body>
 </html>
