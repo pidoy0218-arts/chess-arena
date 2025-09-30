@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>POS System with Park Sale</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body { margin:0; font-family:Arial, sans-serif; display:flex; height:100vh; }
+.cart, .items { padding:10px; box-sizing:border-box; }
+.cart { width:50%; background:#f9f9f9; overflow-y:auto; }
+.items { width:50%; background:#fff; overflow-y:auto; display:flex; flex-direction:column; }
+
+.item-btn { padding:15px; margin:5px 0; border:none; border-radius:8px;
+  cursor:pointer; text-align:left; }
+.item-name { font-size:14px; display:block; }
+.item-price { font-size:18px; font-weight:bold; display:block; margin-top:5px; }
+
+.cart-item { display:flex; align-items:center; justify-content:space-between; 
+  padding:8px; margin:4px 0; background:#eee; border-radius:6px; }
+.cancel-btn { background:#999; color:#fff; border:none; border-radius:4px;
+  padding:2px 6px; margin-right:8px; cursor:pointer; font-size:14px; }
+
+.footer { position:absolute; bottom:0; left:0; width:100%; background:#222; 
+  color:#fff; padding:10px; display:flex; flex-wrap:wrap; align-items:center; }
+.footer div { margin:5px 10px; font-size:18px; }
+.cash-btn { padding:10px 20px; margin:3px; border:none; border-radius:6px; 
+  background:#007bff; color:#fff; font-size:16px; cursor:pointer; }
+.pay-btn { padding:10px 20px; margin:3px; border:none; border-radius:6px; 
+  background:#28a745; color:#fff; font-size:18px; flex:1; }
+.cash-input { padding:10px; margin:3px; border-radius:6px; border:1px solid #ccc;
+  font-size:16px; width:120px; }
+
+/* Editable header */
+#receiptHeader {
+  text-align:center; font-size:16px; font-weight:normal;
+  padding:10px; border:1px dashed #999; margin-bottom:10px;
+}
+#receiptHeader:focus { outline:2px solid #007bff; border-style:solid; }
+
+/* Park Sale Popup */
+#parkedPanel {
+  display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(0,0,0,0.6); z-index:9999; justify-content:center; align-items:center;
+}
+#parkedBox {
+  background:#fff; padding:20px; border-radius:10px; width:300px; max-height:80%; overflow:auto;
+}
+.park-entry { border:1px solid #ccc; border-radius:6px; margin:6px 0; padding:8px; }
+.park-actions button { margin:3px; padding:4px 8px; border:none; border-radius:4px; cursor:pointer; }
+.resume-btn { background:#28a745; color:#fff; }
+.clear-btn { background:#dc3545; color:#fff; }
+</style>
+</head>
+<body>
+
+<!-- CASHIER SCREEN -->
+<div id="cashier-screen" style="display:flex; width:100%; height:100%;">
+  <div class="cart" id="cart">
+    <div id="receiptHeader" contenteditable="true">
+      Store Name<br>
+      Address Line<br>
+      Contact Info
+    </div>
+  </div>
+  <div class="items" id="items"></div>
+</div>
+
+<div class="footer">
+  <div id="subtotal">Subtotal: ₱0</div>
+  <div id="total">Total: ₱0</div>
+  <div id="change">Change: ₱0</div>
+  <button class="cash-btn" onclick="cashTender(50)">₱50</button>
+  <button class="cash-btn" onclick="cashTender(100)">₱100</button>
+  <button class="cash-btn" onclick="cashTender(200)">₱200</button>
+  <button class="cash-btn" onclick="cashTender(500)">₱500</button>
+  <button class="cash-btn" onclick="cashTender(1000)">₱1000</button>
+  <input class="cash-input" type="number" id="customCash" placeholder="Enter ₱" oninput="customCashTender()">
+  <button class="pay-btn" onclick="payAndReset()">PAY & RESET</button>
+  <button class="cash-btn" onclick="openParked()">Park Sales</button>
+</div>
+
+<!-- Park Sales Panel -->
+<div id="parkedPanel">
+  <div id="parkedBox">
+    <h3>Parked Sales</h3>
+    <div id="parkedList"></div>
+    <button onclick="closeParked()">Close</button>
+  </div>
+</div>
+
+<script>
+// Vars
+let cart=[]; let tendered=0;
+let parked=JSON.parse(localStorage.getItem("PARKED")||"{}");
+
+// Save header
+document.getElementById("receiptHeader").addEventListener("input",()=>{
+  localStorage.setItem("HEADER",document.getElementById("receiptHeader").innerHTML);
+});
+if(localStorage.getItem("HEADER")){
+  document.getElementById("receiptHeader").innerHTML=localStorage.getItem("HEADER");
+}
+
+// Cart
+function addItemToCart(name,price){
+  let f=cart.find(i=>i.name===name);
+  if(f) f.qty++; else cart.push({name,price,qty:1});
+  renderCart();
+}
+function cancelItem(i){
+  if(cart[i].qty>1) cart[i].qty--; else cart.splice(i,1);
+  renderCart();
+}
+function renderCart(){
+  const cartDiv=document.getElementById("cart");
+  cartDiv.innerHTML=`<div id="receiptHeader" contenteditable="true">${localStorage.getItem("HEADER")||""}</div>`;
+  cart.forEach((it,i)=>{
+    let d=document.createElement("div");
+    d.className="cart-item";
+    d.innerHTML=`<button class="cancel-btn" onclick="cancelItem(${i})">❌</button>${it.name} x${it.qty} = ₱${it.price*it.qty}`;
+    cartDiv.appendChild(d);
+  });
+  let subtotal=cart.reduce((a,b)=>a+b.price*b.qty,0);
+  document.getElementById("subtotal").textContent="Subtotal: ₱"+subtotal;
+  document.getElementById("total").textContent="Total: ₱"+subtotal;
+  document.getElementById("change").textContent="Change: ₱"+Math.max(0,tendered-subtotal);
+}
+
+// Tender
+function cashTender(a){ tendered=a; document.getElementById("customCash").value=a; renderCart(); }
+function customCashTender(){ let v=parseFloat(document.getElementById("customCash").value); tendered=isNaN(v)?0:v; renderCart(); }
+function payAndReset(){
+  if(cart.length===0){ alert("Cart empty"); return; }
+  let s=cart.reduce((a,b)=>a+b.price*b.qty,0);
+  if(tendered<s){ alert("Insufficient cash"); return; }
+  alert("Paid. Change: ₱"+(tendered-s));
+  cart=[]; tendered=0; document.getElementById("customCash").value="";
+  renderCart();
+  // Clear parked after payment
+  parked={}; localStorage.removeItem("PARKED"); renderParked();
+}
+
+// Parked
+function openParked(){ document.getElementById("parkedPanel").style.display="flex"; renderParked(); }
+function closeParked(){ document.getElementById("parkedPanel").style.display="none"; }
+function renderParked(){
+  const pl=document.getElementById("parkedList"); pl.innerHTML="";
+  for(let c=1;c<=10;c++){
+    let div=document.createElement("div");
+    div.className="park-entry";
+    div.innerHTML=`<b>Customer ${c}</b><div class="park-actions">
+      <button class="resume-btn" onclick="resumeSale(${c})">Resume</button>
+      <button class="clear-btn" onclick="clearSale(${c})">Clear</button>
+      <button class="cash-btn" onclick="parkSale(${c})">Park</button>
+    </div>`;
+    pl.appendChild(div);
+  }
+}
+function parkSale(cust){
+  if(cart.length===0){ alert("No items to park"); return; }
+  parked[cust]=[...cart];
+  localStorage.setItem("PARKED",JSON.stringify(parked));
+  cart=[]; renderCart(); renderParked();
+}
+function resumeSale(cust){
+  if(parked[cust]){
+    cart=[...parked[cust]];
+    delete parked[cust];
+    localStorage.setItem("PARKED",JSON.stringify(parked));
+    renderCart(); renderParked();
+  } else alert("No sale parked for Customer "+cust);
+}
+function clearSale(cust){
+  delete parked[cust];
+  localStorage.setItem("PARKED",JSON.stringify(parked));
+  renderParked();
+}
+
+// Items (sample)
+let items=[
+  {name:"Burger\nDelicious beef with cheese",price:50,color:"#ffcccb"},
+  {name:"Fries\nCrispy potato fries",price:30,color:"#ffd580"},
+  {name:"Soda\nRefreshing drink",price:20,color:"#add8e6"}
+];
+function renderItems(){
+  const d=document.getElementById("items"); d.innerHTML="";
+  items.forEach(i=>{
+    let b=document.createElement("button");
+    b.className="item-btn"; b.style.background=i.color;
+    b.innerHTML=`<span class="item-name">${i.name}</span><span class="item-price">₱${i.price}</span>`;
+    b.onclick=()=>addItemToCart(i.name,i.price);
+    d.appendChild(b);
+  });
+}
+
+// Init
+renderItems(); renderCart();
+</script>
+</body>
+</html>
